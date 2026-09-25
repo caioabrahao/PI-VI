@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">COS Hub — casa conectada</title>
+  <desc id="desc">Casa ciano contendo três dispositivos ligados a um hub central, sobre fundo azul escuro.</desc>
+  <rect width="512" height="512" rx="104" fill="#101828"/>
+  <g fill="none" stroke="#67E8F9" stroke-width="22" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M87 233 256 92l169 141v172a24 24 0 0 1-24 24H111a24 24 0 0 1-24-24V233Z"/>
+    <path d="M357 161v-36h40v69"/>
+  </g>
+  <g fill="none" stroke="#67E8F9" stroke-width="12" stroke-linecap="round">
+    <path d="M256 268v-55M239 297l-73 58M273 297l73 58"/>
+  </g>
+  <g fill="#67E8F9">
+    <circle cx="256" cy="190" r="24"/>
+    <circle cx="256" cy="297" r="31"/>
+    <circle cx="150" cy="367" r="24"/>
+    <circle cx="362" cy="367" r="24"/>
+  </g>
+</svg>
