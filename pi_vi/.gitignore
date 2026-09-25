@@ -43,3 +43,24 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+
+# Firebase administrative credentials
+*service-account*.json
+*serviceAccountKey*.json
+firebase-debug.log
+firebase-debug.*.log
+firestore-debug.log
+ui-debug.log
+
+# Android signing credentials
+*.jks
+*.keystore
+/android/key.properties
+
+# Local development files
+*.local
