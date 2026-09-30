@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'package:flutter_svg/flutter_svg.dart';
+
 import 'login_screen.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -34,7 +36,11 @@ class _SplashScreenState extends State<SplashScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.hub, size: 160, color: Color(0xFF67E8F9)),
+            SvgPicture.asset(
+              'assets/images/cos_hub_logo.svg',
+              width: 160,
+              height: 160,
+            ),
             const SizedBox(height: 32),
             const CircularProgressIndicator(
               color: Color(0xFF67E8F9),
