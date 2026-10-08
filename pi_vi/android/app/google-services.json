@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "972885190769",
+    "project_id": "pi-vi-d3b7e",
+    "storage_bucket": "pi-vi-d3b7e.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:972885190769:android:ce92b723d535ce79bc93d0",
+        "android_client_info": {
+          "package_name": "Cos.hub.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAMZKX4jV-v6TuC1OhCEwsm63PSwaD00q0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:972885190769:android:52e29fec60752e78bc93d0",
+        "android_client_info": {
+          "package_name": "com.example.pi_vi"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAMZKX4jV-v6TuC1OhCEwsm63PSwaD00q0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
