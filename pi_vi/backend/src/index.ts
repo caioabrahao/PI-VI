@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import { connectDB } from './config/database';
 import { register, login } from './controllers/authController';
 import { authenticateToken, AuthRequest } from './middlewares/authMiddleware';
+import { apiRouter } from './routes/apiRoutes';
 
 dotenv.config();
 
@@ -14,6 +15,8 @@ connectDB();
 // Rotas públicas
 app.post('/api/register', register);
 app.post('/api/login', login);
+
+app.use('/api', apiRouter);
 
 // Rota protegida (exemplo)
 app.get('/api/perfil', authenticateToken, (req: AuthRequest, res) => {
