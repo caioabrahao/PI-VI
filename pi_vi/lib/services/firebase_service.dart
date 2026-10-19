@@ -18,12 +18,11 @@ class FirebaseService {
     );
   }
 
-  // Criar conta e salvar os dados no Firestore
+  // Criar conta e salvar somente os dados do perfil no Firestore
   static Future<UserCredential> cadastrar({
     required String nome,
     required String email,
     required String senha,
-    required String casa,
   }) async {
     final credencial = await _auth.createUserWithEmailAndPassword(
       email: email.trim(),
@@ -39,24 +38,36 @@ class FirebaseService {
         'uid': usuario.uid,
         'nome': nome.trim(),
         'email': email.trim(),
-        'casa': casa.trim(),
         'criadoEm': FieldValue.serverTimestamp(),
       });
+
+      return credencial;
     } catch (e) {
-      // Se o cadastro no banco falhar, remove a conta criada
-      // para evitar uma conta parcialmente cadastrada.
+      // Tenta remover a conta caso ocorra uma falha ao salvar o perfil.
       try {
         await usuario.delete();
-      } catch (_) {}
+      } catch (_) {
+        // A exclusão pode falhar se a sessão exigir autenticação recente.
+      }
+
       rethrow;
     }
-
-    return credencial;
   }
 
   // Enviar e-mail para redefinir a senha
   static Future<void> recuperarSenha(String email) async {
     await _auth.sendPasswordResetEmail(email: email.trim());
+  }
+
+  // Alterar a senha do usuário autenticado
+  static Future<void> alterarSenha(String novaSenha) async {
+    final usuario = _auth.currentUser;
+
+    if (usuario == null) {
+      throw Exception('Faça login novamente para alterar sua senha.');
+    }
+
+    await usuario.updatePassword(novaSenha);
   }
 
   // Encerrar a sessão
@@ -68,7 +79,9 @@ class FirebaseService {
   static Future<Map<String, dynamic>?> obterPerfil(String uid) async {
     final documento = await _db.collection('usuarios').doc(uid).get();
 
-    if (!documento.exists) return null;
+    if (!documento.exists) {
+      return null;
+    }
 
     return documento.data();
   }

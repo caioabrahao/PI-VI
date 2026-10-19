@@ -17,7 +17,7 @@ class _CadastroScreenState extends State<CadastroScreen> {
   final nome = TextEditingController();
   final email = TextEditingController();
   final senha = TextEditingController();
-  final casa = TextEditingController();
+  final confirmarSenha = TextEditingController();
 
   bool aceitou = false;
   bool mostrarSenha = false;
@@ -28,7 +28,7 @@ class _CadastroScreenState extends State<CadastroScreen> {
     nome.dispose();
     email.dispose();
     senha.dispose();
-    casa.dispose();
+    confirmarSenha.dispose();
     super.dispose();
   }
 
@@ -73,7 +73,6 @@ class _CadastroScreenState extends State<CadastroScreen> {
         nome: nome.text,
         email: email.text,
         senha: senha.text,
-        casa: casa.text,
       );
 
       if (!mounted) return;
@@ -177,8 +176,9 @@ class _CadastroScreenState extends State<CadastroScreen> {
                       'Mínimo de 6 caracteres',
                       ocultar: !mostrarSenha,
                       sufixo: IconButton(
-                        onPressed: () =>
-                            setState(() => mostrarSenha = !mostrarSenha),
+                        onPressed: () {
+                          setState(() => mostrarSenha = !mostrarSenha);
+                        },
                         icon: Icon(
                           mostrarSenha
                               ? Icons.visibility_outlined
@@ -192,22 +192,34 @@ class _CadastroScreenState extends State<CadastroScreen> {
                     ),
                     const SizedBox(height: 14),
 
-                    _label('Nome da casa'),
+                    // NOVO CAMPO: CONFIRMAR SENHA
+                    _label('Confirmar senha'),
                     const SizedBox(height: 7),
                     _campo(
-                      casa,
-                      Icons.home_outlined,
-                      'Ex.: Minha casa',
-                      validator: (v) => v == null || v.trim().isEmpty
-                          ? 'Informe o nome da casa.'
-                          : null,
+                      confirmarSenha,
+                      Icons.lock_outline,
+                      'Digite a senha novamente',
+                      ocultar: !mostrarSenha,
+                      validator: (v) {
+                        if (v == null || v.isEmpty) {
+                          return 'Confirme sua senha.';
+                        }
+
+                        if (v != senha.text) {
+                          return 'As senhas não coincidem.';
+                        }
+
+                        return null;
+                      },
                     ),
                     const SizedBox(height: 16),
 
                     CheckboxListTile(
                       contentPadding: EdgeInsets.zero,
                       value: aceitou,
-                      onChanged: (v) => setState(() => aceitou = v ?? false),
+                      onChanged: (v) {
+                        setState(() => aceitou = v ?? false);
+                      },
                       activeColor: mint,
                       checkColor: bg,
                       controlAffinity: ListTileControlAffinity.leading,
