@@ -16,35 +16,555 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  bool _luzSalaLigada = true;
-  bool _arLigado = false;
-  bool _luzQuartoLigada = false;
-  bool _tomadaLigada = true;
+  final List<_RoomData> _ambientes = [
+    _RoomData(
+      nome: 'Sala de estar',
+      dispositivos: ['Luz da sala', 'Ar-condicionado'],
+      icone: Icons.weekend_outlined,
+    ),
+    _RoomData(
+      nome: 'Quarto',
+      dispositivos: ['Luz do quarto'],
+      icone: Icons.bed_outlined,
+    ),
+    _RoomData(
+      nome: 'Cozinha',
+      dispositivos: ['Tomada inteligente'],
+      icone: Icons.kitchen_outlined,
+    ),
+    _RoomData(
+      nome: 'Banheiro',
+      dispositivos: [],
+      icone: Icons.shower_outlined,
+    ),
+  ];
 
-  int get _dispositivosLigados => [
-    _luzSalaLigada,
-    _arLigado,
-    _luzQuartoLigada,
-    _tomadaLigada,
-  ].where((ligado) => ligado).length;
+  final List<_DeviceData> _dispositivos = [
+    _DeviceData(
+      nome: 'Luz da sala',
+      local: 'Sala de estar',
+      icone: Icons.lightbulb_outline_rounded,
+      ligado: true,
+    ),
+    _DeviceData(
+      nome: 'Ar-condicionado',
+      local: 'Sala de estar',
+      icone: Icons.ac_unit_rounded,
+      ligado: false,
+    ),
+    _DeviceData(
+      nome: 'Luz do quarto',
+      local: 'Quarto',
+      icone: Icons.lightbulb_outline_rounded,
+      ligado: false,
+    ),
+    _DeviceData(
+      nome: 'Tomada inteligente',
+      local: 'Cozinha',
+      icone: Icons.power_rounded,
+      ligado: true,
+    ),
+    _DeviceData(
+      nome: 'Lâmpada',
+      local: 'Sem ambiente',
+      icone: Icons.lightbulb_outline_rounded,
+      ligado: false,
+    ),
+    _DeviceData(
+      nome: 'Tomada TV',
+      local: 'Sem ambiente',
+      icone: Icons.power_rounded,
+      ligado: false,
+    ),
+  ];
 
-  void _alternarDispositivo(String nome, bool valor) {
-    setState(() {
-      switch (nome) {
-        case 'Luz da sala':
-          _luzSalaLigada = valor;
+  int get _dispositivosLigados =>
+      _dispositivos.where((dispositivo) => dispositivo.ligado).length;
+
+  void _atualizarLocaisDispositivos() {
+    for (final dispositivo in _dispositivos) {
+      dispositivo.local = 'Sem ambiente';
+      for (final ambiente in _ambientes) {
+        if (ambiente.dispositivos.contains(dispositivo.nome)) {
+          dispositivo.local = ambiente.nome;
           break;
-        case 'Ar-condicionado':
-          _arLigado = valor;
-          break;
-        case 'Luz do quarto':
-          _luzQuartoLigada = valor;
-          break;
-        case 'Tomada inteligente':
-          _tomadaLigada = valor;
-          break;
+        }
       }
+    }
+  }
+
+  String _resumoAmbiente(_RoomData ambiente) {
+    final quantidade = ambiente.dispositivos.length;
+    if (quantidade == 0) return 'Nenhum dispositivo';
+    return '$quantidade ${quantidade == 1 ? 'dispositivo' : 'dispositivos'}';
+  }
+
+  Future<void> _gerenciarAmbientes() async {
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          backgroundColor: _panel,
+          title: const Text(
+            'Gerenciar ambientes',
+            style: TextStyle(color: _fg, fontWeight: FontWeight.w700),
+          ),
+          content: SizedBox(
+            width: 420,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.sizeOf(context).height * 0.5,
+              ),
+              child: _ambientes.isEmpty
+                  ? const Center(
+                      child: Text(
+                        'Nenhum ambiente cadastrado.',
+                        style: TextStyle(color: _muted),
+                      ),
+                    )
+                  : ListView.separated(
+                      shrinkWrap: true,
+                      itemCount: _ambientes.length,
+                      separatorBuilder: (_, _) => const Divider(
+                        color: _border,
+                        height: 1,
+                      ),
+                      itemBuilder: (context, index) {
+                        final ambiente = _ambientes[index];
+                        return ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: Text(
+                            ambiente.nome,
+                            style: const TextStyle(color: _fg),
+                          ),
+                          subtitle: Text(
+                            _resumoAmbiente(ambiente),
+                            style: const TextStyle(color: _muted),
+                          ),
+                          onTap: () async {
+                            await _editarAmbiente(ambiente);
+                            setDialogState(() {});
+                          },
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                tooltip: 'Editar ambiente',
+                                onPressed: () async {
+                                  await _editarAmbiente(ambiente);
+                                  setDialogState(() {});
+                                },
+                                icon: const Icon(
+                                  Icons.edit_outlined,
+                                  color: _mint,
+                                ),
+                              ),
+                              IconButton(
+                                tooltip: 'Excluir ambiente',
+                                onPressed: () async {
+                                  await _confirmarExcluirAmbiente(ambiente);
+                                  setDialogState(() {});
+                                },
+                                icon: const Icon(
+                                  Icons.delete_outline,
+                                  color: Colors.redAccent,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ),
+          actions: [
+            TextButton.icon(
+              onPressed: () {
+                Navigator.pop(dialogContext);
+                _novoAmbiente();
+              },
+              icon: const Icon(Icons.add),
+              label: const Text('Adicionar ambiente'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Fechar'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _novoAmbiente() async {
+    final formKey = GlobalKey<FormState>();
+    var nome = '';
+    final nomeConfirmado = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: _panel,
+        title: const Text(
+          'Novo ambiente',
+          style: TextStyle(color: _fg, fontWeight: FontWeight.w700),
+        ),
+        content: Form(
+          key: formKey,
+          child: TextFormField(
+            autofocus: true,
+            style: const TextStyle(color: _fg),
+            decoration: const InputDecoration(labelText: 'Nome do ambiente'),
+            onChanged: (value) => nome = value,
+            validator: (value) {
+              final nome = value?.trim() ?? '';
+              if (nome.isEmpty) return 'Digite um nome.';
+              if (_ambientes.any(
+                (ambiente) => ambiente.nome.toLowerCase() == nome.toLowerCase(),
+              )) {
+                return 'Já existe um ambiente com esse nome.';
+              }
+              return null;
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (formKey.currentState!.validate()) {
+                Navigator.pop(dialogContext, nome.trim());
+              }
+            },
+            child: const Text('Criar'),
+          ),
+        ],
+      ),
+    );
+    if (nomeConfirmado == null) return;
+
+    final ambiente = _RoomData(
+      nome: nomeConfirmado,
+      dispositivos: [],
+      icone: Icons.meeting_room_outlined,
+    );
+    setState(() => _ambientes.add(ambiente));
+    await _editarAmbiente(ambiente);
+  }
+
+  Future<void> _editarAmbiente(_RoomData ambiente) async {
+    var nomeAmbiente = ambiente.nome;
+    final formKey = GlobalKey<FormState>();
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          backgroundColor: _panel,
+          title: const Text(
+            'Editar ambiente',
+            style: TextStyle(color: _fg, fontWeight: FontWeight.w700),
+          ),
+          content: SizedBox(
+            width: 420,
+            child: Form(
+              key: formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextFormField(
+                    initialValue: ambiente.nome,
+                    style: const TextStyle(color: _fg),
+                    decoration: const InputDecoration(
+                      labelText: 'Nome do ambiente',
+                    ),
+                    onChanged: (value) => nomeAmbiente = value,
+                    validator: (value) {
+                      final nome = value?.trim() ?? '';
+                      if (nome.isEmpty) return 'Digite um nome.';
+                      if (_ambientes.any(
+                        (item) =>
+                            !identical(item, ambiente) &&
+                            item.nome.toLowerCase() == nome.toLowerCase(),
+                      )) {
+                        return 'Já existe um ambiente com esse nome.';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 20),
+                  Row(
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          'Dispositivos conectados',
+                          style: TextStyle(
+                            color: _fg,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      TextButton.icon(
+                        onPressed: () async {
+                          final selecionados =
+                              await _adicionarDispositivosAoAmbiente(ambiente);
+                          if (selecionados.isNotEmpty) {
+                            setDialogState(() {});
+                          }
+                        },
+                        icon: const Icon(Icons.add, size: 18),
+                        label: const Text('Adicionar'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  if (ambiente.dispositivos.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                      child: Text(
+                        'Nenhum dispositivo conectado.',
+                        style: TextStyle(color: _muted),
+                      ),
+                    )
+                  else
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxHeight: 220),
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        itemCount: ambiente.dispositivos.length,
+                        separatorBuilder: (_, _) => const Divider(
+                          color: _border,
+                          height: 1,
+                        ),
+                        itemBuilder: (context, index) {
+                          final nomeDispositivo = ambiente.dispositivos[index];
+                          final dispositivo = _dispositivos.firstWhere(
+                            (item) => item.nome == nomeDispositivo,
+                          );
+                          return ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            leading: Icon(dispositivo.icone, color: _mint),
+                            title: Text(
+                              dispositivo.nome,
+                              style: const TextStyle(color: _fg),
+                            ),
+                            trailing: IconButton(
+                              tooltip: 'Remover dispositivo',
+                              onPressed: () async {
+                                final confirmou = await showDialog<bool>(
+                                  context: context,
+                                  builder: (confirmContext) => AlertDialog(
+                                    backgroundColor: _panel,
+                                    title: const Text(
+                                      'Remover dispositivo?',
+                                      style: TextStyle(color: _fg),
+                                    ),
+                                    content: Text(
+                                      'Você deseja excluir "$nomeDispositivo" deste ambiente?',
+                                      style: const TextStyle(color: _muted),
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () =>
+                                            Navigator.pop(confirmContext, false),
+                                        child: const Text('Cancelar'),
+                                      ),
+                                      TextButton(
+                                        onPressed: () =>
+                                            Navigator.pop(confirmContext, true),
+                                        child: const Text(
+                                          'Remover',
+                                          style: TextStyle(
+                                            color: Colors.redAccent,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                                if (confirmou == true) {
+                                  setState(() {
+                                    ambiente.dispositivos.remove(
+                                      nomeDispositivo,
+                                    );
+                                    _atualizarLocaisDispositivos();
+                                  });
+                                  setDialogState(() {});
+                                }
+                              },
+                              icon: const Icon(
+                                Icons.remove_circle_outline,
+                                color: Colors.redAccent,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancelar'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (!formKey.currentState!.validate()) return;
+                setState(() {
+                  ambiente.nome = nomeAmbiente.trim();
+                  _atualizarLocaisDispositivos();
+                });
+                Navigator.pop(dialogContext);
+              },
+              child: const Text('Salvar'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<List<String>> _adicionarDispositivosAoAmbiente(
+    _RoomData ambiente,
+  ) async {
+    final disponiveis = _dispositivos
+        .where((dispositivo) => dispositivo.local == 'Sem ambiente')
+        .toList();
+    if (disponiveis.isEmpty) {
+      _mostrarMensagem('Não há dispositivos disponíveis para conectar.');
+      return [];
+    }
+
+    final selecionados = <String>{};
+    final resultado = await showDialog<List<String>>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          backgroundColor: _panel,
+          title: const Text(
+            'Adicionar dispositivos',
+            style: TextStyle(color: _fg, fontWeight: FontWeight.w700),
+          ),
+          content: SizedBox(
+            width: 380,
+            child: ListView(
+              shrinkWrap: true,
+              children: disponiveis
+                  .map(
+                    (dispositivo) => CheckboxListTile(
+                      contentPadding: EdgeInsets.zero,
+                      value: selecionados.contains(dispositivo.nome),
+                      activeColor: _mint,
+                      title: Text(
+                        dispositivo.nome,
+                        style: const TextStyle(color: _fg),
+                      ),
+                      secondary: Icon(dispositivo.icone, color: _mint),
+                      onChanged: (marcado) {
+                        setDialogState(() {
+                          if (marcado == true) {
+                            selecionados.add(dispositivo.nome);
+                          } else {
+                            selecionados.remove(dispositivo.nome);
+                          }
+                        });
+                      },
+                    ),
+                  )
+                  .toList(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancelar'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(
+                dialogContext,
+                selecionados.toList(),
+              ),
+              child: const Text('Conectar'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (resultado == null || resultado.isEmpty) return [];
+    setState(() {
+      ambiente.dispositivos.addAll(resultado);
+      _atualizarLocaisDispositivos();
     });
+    return resultado;
+  }
+
+  Future<void> _confirmarExcluirAmbiente(_RoomData ambiente) async {
+    final dispositivos = ambiente.dispositivos;
+    final pergunta = dispositivos.isEmpty
+        ? 'Você deseja excluir o ambiente ${ambiente.nome}?'
+        : 'Você deseja excluir ${ambiente.nome} com os dispositivos ${dispositivos.join(' e ')}?';
+    final continuar = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: _panel,
+        title: const Text(
+          'Excluir ambiente?',
+          style: TextStyle(color: _fg),
+        ),
+        content: Text(pergunta, style: const TextStyle(color: _muted)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Continuar'),
+          ),
+        ],
+      ),
+    );
+    if (continuar != true || !mounted) return;
+
+    final confirmarExclusao = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: _panel,
+        title: const Text(
+          'Tem certeza que deseja excluir?',
+          style: TextStyle(color: _fg),
+        ),
+        content: const Text(
+          'Os dispositivos ficarão disponíveis para outro ambiente.',
+          style: TextStyle(color: _muted),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text(
+              'Excluir ambiente',
+              style: TextStyle(color: Colors.redAccent),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirmarExclusao != true || !mounted) return;
+
+    setState(() {
+      _ambientes.remove(ambiente);
+      _atualizarLocaisDispositivos();
+    });
+    _mostrarMensagem('Ambiente "${ambiente.nome}" excluído.');
   }
 
   void _mostrarMensagem(String mensagem) {
@@ -101,7 +621,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   const SizedBox(height: 28),
                   _tituloSecao(
                     'Dispositivos',
-                    '$_dispositivosLigados de 4 ligados',
+                    '$_dispositivosLigados de ${_dispositivos.length} ligados',
                     acao: 'Ver todos',
                     onAcao: () => _mostrarMensagem(
                       'Você está vendo os dispositivos cadastrados nesta demonstração.',
@@ -116,11 +636,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   const SizedBox(height: 28),
                   _tituloSecao(
                     'Ambientes',
-                    '4 ambientes',
+                    '${_ambientes.length} ambientes',
                     acao: 'Gerenciar',
-                    onAcao: () => _mostrarMensagem(
-                      'O gerenciamento de ambientes será integrado futuramente.',
-                    ),
+                    onAcao: _gerenciarAmbientes,
                   ),
                   const SizedBox(height: 14),
                   _gradeAmbientes(),
@@ -304,7 +822,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           child: _cartaoResumo(
             icone: Icons.power_settings_new_rounded,
             titulo: 'Dispositivos',
-            valor: '$_dispositivosLigados/4',
+            valor: '$_dispositivosLigados/${_dispositivos.length}',
             descricao: 'em funcionamento',
           ),
         ),
@@ -401,35 +919,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _gradeDispositivos() {
-    final dispositivos = [
-      _DeviceData(
-        nome: 'Luz da sala',
-        local: 'Sala de estar',
-        icone: Icons.lightbulb_outline_rounded,
-        ligado: _luzSalaLigada,
-      ),
-      _DeviceData(
-        nome: 'Ar-condicionado',
-        local: 'Sala de estar',
-        icone: Icons.ac_unit_rounded,
-        ligado: _arLigado,
-      ),
-      _DeviceData(
-        nome: 'Luz do quarto',
-        local: 'Quarto principal',
-        icone: Icons.lightbulb_outline_rounded,
-        ligado: _luzQuartoLigada,
-      ),
-      _DeviceData(
-        nome: 'Tomada inteligente',
-        local: 'Cozinha',
-        icone: Icons.power_rounded,
-        ligado: _tomadaLigada,
-      ),
-    ];
-
     return GridView.builder(
-      itemCount: dispositivos.length,
+      itemCount: _dispositivos.length,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -439,12 +930,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
         mainAxisExtent: 158,
       ),
       itemBuilder: (context, index) {
-        final dispositivo = dispositivos[index];
+        final dispositivo = _dispositivos[index];
 
         return _DeviceCard(
           data: dispositivo,
           onChanged: (valor) {
-            _alternarDispositivo(dispositivo.nome, valor);
+            setState(() => dispositivo.ligado = valor);
           },
         );
       },
@@ -546,31 +1037,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _gradeAmbientes() {
-    final ambientes = [
-      const _RoomData(
-        nome: 'Sala de estar',
-        dispositivos: '2 dispositivos',
-        icone: Icons.weekend_outlined,
-      ),
-      const _RoomData(
-        nome: 'Quarto',
-        dispositivos: '1 dispositivo',
-        icone: Icons.bed_outlined,
-      ),
-      const _RoomData(
-        nome: 'Cozinha',
-        dispositivos: '1 dispositivo',
-        icone: Icons.kitchen_outlined,
-      ),
-      const _RoomData(
-        nome: 'Banheiro',
-        dispositivos: 'Nenhum dispositivo',
-        icone: Icons.shower_outlined,
-      ),
-    ];
-
     return GridView.builder(
-      itemCount: ambientes.length,
+      itemCount: _ambientes.length,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -580,7 +1048,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         mainAxisExtent: 106,
       ),
       itemBuilder: (context, index) {
-        final ambiente = ambientes[index];
+        final ambiente = _ambientes[index];
 
         return InkWell(
           borderRadius: BorderRadius.circular(18),
@@ -622,7 +1090,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ),
                       const SizedBox(height: 5),
                       Text(
-                        ambiente.dispositivos,
+                        _resumoAmbiente(ambiente),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(color: _muted, fontSize: 9),
@@ -714,11 +1182,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
 class _DeviceData {
   final String nome;
-  final String local;
+  String local;
   final IconData icone;
-  final bool ligado;
+  bool ligado;
 
-  const _DeviceData({
+  _DeviceData({
     required this.nome,
     required this.local,
     required this.icone,
@@ -818,11 +1286,11 @@ class _DeviceCard extends StatelessWidget {
 }
 
 class _RoomData {
-  final String nome;
-  final String dispositivos;
+  String nome;
+  final List<String> dispositivos;
   final IconData icone;
 
-  const _RoomData({
+  _RoomData({
     required this.nome,
     required this.dispositivos,
     required this.icone,

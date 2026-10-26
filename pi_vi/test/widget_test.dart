@@ -1,30 +1,68 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-import 'package:pi_vi/main.dart';
+import 'package:pi_vi/screens/dashboard.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const COSApp());
+  testWidgets('conecta um dispositivo disponível a um ambiente', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const MaterialApp(home: DashboardScreen()));
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    await tester.scrollUntilVisible(
+      find.text('Gerenciar'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.drag(find.byType(CustomScrollView).first, const Offset(0, -260));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Gerenciar'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Editar ambiente').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(TextButton, 'Adicionar'));
+    await tester.pumpAndSettle();
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+    expect(find.text('Adicionar dispositivos'), findsOneWidget);
+    await tester.tap(find.text('Lâmpada').last);
+    await tester.tap(find.text('Conectar'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Salvar'));
+    await tester.pumpAndSettle();
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    expect(find.text('Banheiro'), findsWidgets);
+    expect(find.text('1 dispositivo'), findsWidgets);
+  });
+
+  testWidgets('exige duas confirmações para excluir ambiente com dispositivos', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const MaterialApp(home: DashboardScreen()));
+
+    await tester.scrollUntilVisible(
+      find.text('Gerenciar'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.drag(find.byType(CustomScrollView).first, const Offset(0, -260));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Gerenciar'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Excluir ambiente').first);
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text(
+        'Você deseja excluir Sala de estar com os dispositivos Luz da sala e Ar-condicionado?',
+      ),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('Continuar'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Tem certeza que deseja excluir?'), findsOneWidget);
+    await tester.tap(find.text('Excluir ambiente'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('3 ambientes'), findsOneWidget);
   });
 }
