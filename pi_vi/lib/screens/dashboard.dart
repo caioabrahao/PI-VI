@@ -8,6 +8,7 @@ const Color _muted = Color(0xFF8A98A5);
 const Color _fg = Color(0xFFF1F5F8);
 const Color _mint = Color(0xFF4FE0C0);
 
+
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
 
@@ -32,11 +33,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       dispositivos: ['Tomada inteligente'],
       icone: Icons.kitchen_outlined,
     ),
-    _RoomData(
-      nome: 'Banheiro',
-      dispositivos: [],
-      icone: Icons.shower_outlined,
-    ),
+    _RoomData(nome: 'Banheiro', dispositivos: [], icone: Icons.shower_outlined),
   ];
 
   final List<_DeviceData> _dispositivos = [
@@ -77,6 +74,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ligado: false,
     ),
   ];
+
+  final List<_AtalhoData> _atalhosSalvos = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _atalhosSalvos.addAll([
+      _AtalhoData(
+        nome: 'Modo noite',
+        configuracoes: {
+          _ambientes[0]: {_dispositivos[0]: false, _dispositivos[1]: false},
+          _ambientes[1]: {_dispositivos[2]: false},
+        },
+      ),
+      _AtalhoData(
+        nome: 'Modo dia',
+        configuracoes: {
+          _ambientes[0]: {_dispositivos[0]: true, _dispositivos[1]: false},
+          _ambientes[2]: {_dispositivos[3]: true},
+        },
+      ),
+    ]);
+  }
 
   int get _dispositivosLigados =>
       _dispositivos.where((dispositivo) => dispositivo.ligado).length;
@@ -125,10 +145,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   : ListView.separated(
                       shrinkWrap: true,
                       itemCount: _ambientes.length,
-                      separatorBuilder: (_, _) => const Divider(
-                        color: _border,
-                        height: 1,
-                      ),
+                      separatorBuilder: (_, _) =>
+                          const Divider(color: _border, height: 1),
                       itemBuilder: (context, index) {
                         final ambiente = _ambientes[index];
                         return ListTile(
@@ -333,10 +351,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       child: ListView.separated(
                         shrinkWrap: true,
                         itemCount: ambiente.dispositivos.length,
-                        separatorBuilder: (_, _) => const Divider(
-                          color: _border,
-                          height: 1,
-                        ),
+                        separatorBuilder: (_, _) =>
+                            const Divider(color: _border, height: 1),
                         itemBuilder: (context, index) {
                           final nomeDispositivo = ambiente.dispositivos[index];
                           final dispositivo = _dispositivos.firstWhere(
@@ -366,8 +382,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                     ),
                                     actions: [
                                       TextButton(
-                                        onPressed: () =>
-                                            Navigator.pop(confirmContext, false),
+                                        onPressed: () => Navigator.pop(
+                                          confirmContext,
+                                          false,
+                                        ),
                                         child: const Text('Cancelar'),
                                       ),
                                       TextButton(
@@ -388,6 +406,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                     ambiente.dispositivos.remove(
                                       nomeDispositivo,
                                     );
+                                    for (final atalho in _atalhosSalvos) {
+                                      atalho.configuracoes[ambiente]?.remove(
+                                        dispositivo,
+                                      );
+                                    }
                                     _atualizarLocaisDispositivos();
                                   });
                                   setDialogState(() {});
@@ -484,10 +507,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
               child: const Text('Cancelar'),
             ),
             ElevatedButton(
-              onPressed: () => Navigator.pop(
-                dialogContext,
-                selecionados.toList(),
-              ),
+              onPressed: () =>
+                  Navigator.pop(dialogContext, selecionados.toList()),
               child: const Text('Conectar'),
             ),
           ],
@@ -512,10 +533,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         backgroundColor: _panel,
-        title: const Text(
-          'Excluir ambiente?',
-          style: TextStyle(color: _fg),
-        ),
+        title: const Text('Excluir ambiente?', style: TextStyle(color: _fg)),
         content: Text(pergunta, style: const TextStyle(color: _muted)),
         actions: [
           TextButton(
@@ -562,6 +580,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     setState(() {
       _ambientes.remove(ambiente);
+      for (final atalho in _atalhosSalvos) {
+        atalho.configuracoes.remove(ambiente);
+      }
       _atualizarLocaisDispositivos();
     });
     _mostrarMensagem('Ambiente "${ambiente.nome}" excluído.');
@@ -577,26 +598,267 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  void _novoAtalho() {
-    showDialog<void>(
+  Future<void> _novoAtalho() => _editarAtalho();
+
+  Future<void> _editarAtalho([_AtalhoData? atalho]) async {
+    final formKey = GlobalKey<FormState>();
+    var nome = atalho?.nome ?? '';
+    var erroAmbiente = false;
+    final configuracoes = <_RoomData, Map<_DeviceData, bool>>{};
+    if (atalho != null) {
+      for (final entrada in atalho.configuracoes.entries) {
+        configuracoes[entrada.key] = Map<_DeviceData, bool>.from(entrada.value);
+      }
+    }
+
+    final resultado = await showDialog<_AtalhoData>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          backgroundColor: _panel,
+          title: Text(
+            atalho == null ? 'Criar modo' : 'Editar modo',
+            style: const TextStyle(color: _fg, fontWeight: FontWeight.w700),
+          ),
+          content: SizedBox(
+            width: 440,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.sizeOf(context).height * 0.62,
+              ),
+              child: Form(
+                key: formKey,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      TextFormField(
+                        initialValue: nome,
+                        autofocus: atalho == null,
+                        style: const TextStyle(color: _fg),
+                        decoration: const InputDecoration(
+                          labelText: 'Nome do modo',
+                          hintText: 'Ex.: Modo gamer',
+                        ),
+                        onChanged: (value) => nome = value,
+                        validator: (value) {
+                          final nomeInformado = value?.trim() ?? '';
+                          if (nomeInformado.isEmpty) return 'Digite um nome.';
+                          if (_atalhosSalvos.any(
+                            (item) =>
+                                !identical(item, atalho) &&
+                                item.nome.toLowerCase() ==
+                                    nomeInformado.toLowerCase(),
+                          )) {
+                            return 'Já existe um modo com esse nome.';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 20),
+                      const Text(
+                        'Ambientes e dispositivos',
+                        style: TextStyle(
+                          color: _fg,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      const Text(
+                        'Escolha os ambientes, os dispositivos e o estado desejado.',
+                        style: TextStyle(color: _muted, fontSize: 12),
+                      ),
+                      const SizedBox(height: 10),
+                      for (final ambiente in _ambientes) ...[
+                        CheckboxListTile(
+                          contentPadding: EdgeInsets.zero,
+                          dense: true,
+                          value: configuracoes.containsKey(ambiente),
+                          activeColor: _mint,
+                          title: Text(
+                            ambiente.nome,
+                            style: const TextStyle(
+                              color: _fg,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          subtitle: Text(
+                            _resumoAmbiente(ambiente),
+                            style: const TextStyle(color: _muted, fontSize: 11),
+                          ),
+                          onChanged: (selecionado) {
+                            setDialogState(() {
+                              erroAmbiente = false;
+                              if (selecionado == true) {
+                                configuracoes.putIfAbsent(
+                                  ambiente,
+                                  () => <_DeviceData, bool>{},
+                                );
+                              } else {
+                                configuracoes.remove(ambiente);
+                              }
+                            });
+                          },
+                        ),
+                        if (configuracoes.containsKey(ambiente))
+                          for (final nomeDispositivo in ambiente.dispositivos)
+                            Builder(
+                              builder: (context) {
+                                final dispositivo = _dispositivos.firstWhere(
+                                  (item) => item.nome == nomeDispositivo,
+                                );
+                                final dispositivosDoAmbiente =
+                                    configuracoes[ambiente]!;
+                                final selecionado = dispositivosDoAmbiente
+                                    .containsKey(dispositivo);
+                                return Padding(
+                                  padding: const EdgeInsets.only(left: 22),
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        child: CheckboxListTile(
+                                          contentPadding: EdgeInsets.zero,
+                                          dense: true,
+                                          value: selecionado,
+                                          activeColor: _mint,
+                                          title: Text(
+                                            dispositivo.nome,
+                                            style: const TextStyle(
+                                              color: _muted,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                          onChanged: (marcado) {
+                                            setDialogState(() {
+                                              if (marcado == true) {
+                                                dispositivosDoAmbiente[dispositivo] =
+                                                    dispositivo.ligado;
+                                              } else {
+                                                dispositivosDoAmbiente.remove(
+                                                  dispositivo,
+                                                );
+                                              }
+                                            });
+                                          },
+                                        ),
+                                      ),
+                                      if (selecionado)
+                                        Switch.adaptive(
+                                          value:
+                                              dispositivosDoAmbiente[dispositivo]!,
+                                          activeThumbColor: _mint,
+                                          onChanged: (ligado) {
+                                            setDialogState(() {
+                                              dispositivosDoAmbiente[dispositivo] =
+                                                  ligado;
+                                            });
+                                          },
+                                        ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
+                      ],
+                      if (erroAmbiente)
+                        const Padding(
+                          padding: EdgeInsets.only(top: 8),
+                          child: Text(
+                            'Selecione pelo menos um ambiente.',
+                            style: TextStyle(
+                              color: Colors.redAccent,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancelar'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (!formKey.currentState!.validate()) return;
+                if (configuracoes.isEmpty) {
+                  setDialogState(() => erroAmbiente = true);
+                  return;
+                }
+                Navigator.pop(
+                  dialogContext,
+                  _AtalhoData(nome: nome.trim(), configuracoes: configuracoes),
+                );
+              },
+              child: Text(atalho == null ? 'Criar modo' : 'Salvar'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (resultado == null || !mounted) return;
+
+    setState(() {
+      if (atalho == null) {
+        _atalhosSalvos.add(resultado);
+      } else {
+        atalho.nome = resultado.nome;
+        atalho.configuracoes
+          ..clear()
+          ..addAll(resultado.configuracoes);
+      }
+    });
+  }
+
+  Future<void> _excluirAtalho(_AtalhoData atalho) async {
+    final confirmou = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         backgroundColor: _panel,
-        title: const Text(
-          'Criar atalho',
-          style: TextStyle(color: _fg, fontWeight: FontWeight.w700),
-        ),
-        content: const Text(
-          'A criação de rotinas será conectada à automação da casa em uma próxima etapa.',
-          style: TextStyle(color: _muted, height: 1.5),
+        title: const Text('Excluir modo?', style: TextStyle(color: _fg)),
+        content: Text(
+          'O modo "${atalho.nome}" será removido.',
+          style: const TextStyle(color: _muted),
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Entendi', style: TextStyle(color: _mint)),
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text(
+              'Excluir',
+              style: TextStyle(color: Colors.redAccent),
+            ),
           ),
         ],
       ),
+    );
+    if (confirmou != true || !mounted) return;
+    setState(() => _atalhosSalvos.remove(atalho));
+  }
+
+  void _ativarAtalho(_AtalhoData atalho) {
+    var dispositivosAtualizados = 0;
+    setState(() {
+      for (final dispositivos in atalho.configuracoes.values) {
+        for (final entrada in dispositivos.entries) {
+          entrada.key.ligado = entrada.value;
+          dispositivosAtualizados++;
+        }
+      }
+    });
+    _mostrarMensagem(
+      dispositivosAtualizados == 0
+          ? 'Modo "${atalho.nome}" ativado.'
+          : 'Modo "${atalho.nome}" ativado: $dispositivosAtualizados '
+                '${dispositivosAtualizados == 1 ? 'dispositivo atualizado' : 'dispositivos atualizados'}.',
     );
   }
 
@@ -1107,31 +1369,48 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _atalhos() {
-    return Row(
-      children: [
-        Expanded(
-          child: _ShortcutCard(
-            icone: Icons.nightlight_round,
-            titulo: 'Modo noite',
-            descricao: 'Preparar para dormir',
-            onTap: () => _mostrarMensagem(
-              'O modo noite ainda não está conectado aos dispositivos.',
-            ),
-          ),
+    if (_atalhosSalvos.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 12),
+        child: Text(
+          'Nenhum modo criado. Toque em “＋ Criar” para adicionar um.',
+          style: TextStyle(color: _muted),
         ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _ShortcutCard(
-            icone: Icons.wb_sunny_outlined,
-            titulo: 'Modo dia',
-            descricao: 'Ativar rotina da manhã',
-            onTap: () => _mostrarMensagem(
-              'O modo dia ainda não está conectado aos dispositivos.',
-            ),
-          ),
-        ),
-      ],
+      );
+    }
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final largura = (constraints.maxWidth - 12) / 2;
+        return Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          children: [
+            for (final atalho in _atalhosSalvos)
+              SizedBox(
+                width: largura,
+                child: _ShortcutCard(
+                  titulo: atalho.nome,
+                  descricao: _resumoAtalho(atalho),
+                  onTap: () => _ativarAtalho(atalho),
+                  onEdit: () => _editarAtalho(atalho),
+                  onDelete: () => _excluirAtalho(atalho),
+                ),
+              ),
+          ],
+        );
+      },
     );
+  }
+
+  String _resumoAtalho(_AtalhoData atalho) {
+    final ambientes = atalho.configuracoes.length;
+    final dispositivos = atalho.configuracoes.values.fold<int>(
+      0,
+      (quantidade, configurados) => quantidade + configurados.length,
+    );
+    return '$ambientes ${ambientes == 1 ? 'ambiente' : 'ambientes'} • '
+        '$dispositivos ${dispositivos == 1 ? 'dispositivo' : 'dispositivos'}';
   }
 
   Widget _barraNavegacao() {
@@ -1297,17 +1576,26 @@ class _RoomData {
   });
 }
 
+class _AtalhoData {
+  String nome;
+  final Map<_RoomData, Map<_DeviceData, bool>> configuracoes;
+
+  _AtalhoData({required this.nome, required this.configuracoes});
+}
+
 class _ShortcutCard extends StatelessWidget {
-  final IconData icone;
   final String titulo;
   final String descricao;
   final VoidCallback onTap;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
 
   const _ShortcutCard({
-    required this.icone,
     required this.titulo,
     required this.descricao,
     required this.onTap,
+    required this.onEdit,
+    required this.onDelete,
   });
 
   @override
@@ -1325,10 +1613,32 @@ class _ShortcutCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(icone, color: _mint, size: 25),
-            const SizedBox(height: 13),
+            Row(
+              children: [
+                const Icon(Icons.auto_awesome_rounded, color: _mint, size: 22),
+                const Spacer(),
+                PopupMenuButton<String>(
+                  tooltip: 'Opções do modo',
+                  icon: const Icon(Icons.more_vert, color: _muted, size: 20),
+                  onSelected: (opcao) {
+                    if (opcao == 'editar') onEdit();
+                    if (opcao == 'excluir') onDelete();
+                  },
+                  itemBuilder: (context) => const [
+                    PopupMenuItem(value: 'editar', child: Text('Editar modo')),
+                    PopupMenuItem(
+                      value: 'excluir',
+                      child: Text('Excluir modo'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 7),
             Text(
               titulo,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: const TextStyle(
                 color: _fg,
                 fontSize: 13,
@@ -1338,6 +1648,8 @@ class _ShortcutCard extends StatelessWidget {
             const SizedBox(height: 5),
             Text(
               descricao,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
               style: const TextStyle(color: _muted, fontSize: 10, height: 1.4),
             ),
           ],
