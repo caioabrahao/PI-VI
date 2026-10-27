@@ -1,0 +1,77 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /usuarios/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+
+      match /dispositivosIot/{deviceId} {
+        function ownsDevice() {
+          return request.auth != null && request.auth.uid == uid;
+        }
+
+        function hasValidDeviceData() {
+          return request.resource.data.keys().hasOnly([
+              'uid',
+              'nome',
+              'identificador',
+              'tipo',
+              'ambienteId',
+              'statusConexao',
+              'ultimaConexaoEm',
+              'criadoEm',
+              'atualizadoEm'
+            ])
+            && request.resource.data.keys().hasAll([
+              'uid',
+              'nome',
+              'identificador',
+              'tipo',
+              'ambienteId',
+              'statusConexao',
+              'ultimaConexaoEm',
+              'criadoEm',
+              'atualizadoEm'
+            ])
+            && request.resource.data.uid == uid
+            && request.resource.data.nome is string
+            && request.resource.data.nome.size() > 0
+            && request.resource.data.nome.size() <= 80
+            && request.resource.data.identificador is string
+            && request.resource.data.identificador.size() > 0
+            && request.resource.data.identificador.size() <= 128
+            && request.resource.data.tipo is string
+            && request.resource.data.tipo.size() > 0
+            && request.resource.data.tipo.size() <= 50
+            && (
+              request.resource.data.ambienteId == null
+              || (
+                request.resource.data.ambienteId is string
+                && request.resource.data.ambienteId.size() <= 128
+              )
+            )
+            && request.resource.data.statusConexao in [
+              'desconhecido',
+              'conectado',
+              'desconectado'
+            ]
+            && (
+              request.resource.data.ultimaConexaoEm == null
+              || request.resource.data.ultimaConexaoEm is timestamp
+            )
+            && request.resource.data.criadoEm is timestamp
+            && request.resource.data.atualizadoEm is timestamp;
+        }
+
+        allow read, delete: if ownsDevice();
+        allow create: if ownsDevice()
+          && hasValidDeviceData()
+          && request.resource.data.criadoEm == request.time
+          && request.resource.data.atualizadoEm == request.time;
+        allow update: if ownsDevice()
+          && hasValidDeviceData()
+          && request.resource.data.criadoEm == resource.data.criadoEm
+          && request.resource.data.atualizadoEm == request.time;
+      }
+    }
+  }
+}

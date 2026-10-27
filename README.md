@@ -78,6 +78,13 @@ Componente físico baseado em ESP32, responsável por receber os comandos, contr
 
 A comunicação MQTT permite a troca de comandos e atualizações de estado entre os componentes envolvidos na integração IoT.
 
+No aplicativo atual, o cadastro de dispositivos IoT é persistido no
+Cloud Firestore, separado por usuário autenticado. O serviço fornece operações
+de cadastro, consulta, atualização e remoção, com regras de acesso em
+`pi_vi/firestore.rules`. A implementação atende dispositivos como luzes e
+tomadas; a comunicação e o envio de comandos ao hardware dependem da futura
+integração com o protocolo e os dispositivos escolhidos.
+
 ## 🚀 Como Executar o Projeto
 
 ### Pré-requisitos
