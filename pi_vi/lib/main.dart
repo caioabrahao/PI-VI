@@ -1,13 +1,16 @@
+
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 
 import 'firebase_options.dart';
-import 'screens/login.dart';
+import 'screens/splash_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
 
   runApp(const COSApp());
 }
@@ -33,17 +36,16 @@ class COSApp extends StatelessWidget {
         scaffoldBackgroundColor: backgroundColor,
         useMaterial3: true,
 
-        colorScheme:
-            ColorScheme.fromSeed(
-              seedColor: primaryColor,
-              brightness: Brightness.dark,
-            ).copyWith(
-              primary: primaryColor,
-              secondary: primaryColor,
-              surface: surfaceColor,
-              onPrimary: backgroundColor,
-              onSurface: textColor,
-            ),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: primaryColor,
+          brightness: Brightness.dark,
+        ).copyWith(
+          primary: primaryColor,
+          secondary: primaryColor,
+          surface: surfaceColor,
+          onPrimary: backgroundColor,
+          onSurface: textColor,
+        ),
 
         appBarTheme: const AppBarTheme(
           backgroundColor: backgroundColor,
@@ -56,25 +58,36 @@ class COSApp extends StatelessWidget {
           filled: true,
           fillColor: surfaceColor,
           hintStyle: const TextStyle(color: mutedColor),
+
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(14),
             borderSide: const BorderSide(color: borderColor),
           ),
+
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(14),
             borderSide: const BorderSide(color: borderColor),
           ),
+
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(14),
-            borderSide: const BorderSide(color: primaryColor, width: 1.5),
+            borderSide: const BorderSide(
+              color: primaryColor,
+              width: 1.5,
+            ),
           ),
+
           errorBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(14),
             borderSide: const BorderSide(color: Colors.redAccent),
           ),
+
           focusedErrorBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(14),
-            borderSide: const BorderSide(color: Colors.redAccent, width: 1.5),
+            borderSide: const BorderSide(
+              color: Colors.redAccent,
+              width: 1.5,
+            ),
           ),
         ),
 
@@ -97,7 +110,7 @@ class COSApp extends StatelessWidget {
         ),
       ),
 
-      home: const LoginScreen(),
+      home: const SplashScreen(),
     );
   }
 }
