@@ -13,7 +13,7 @@ void main() {
       300,
       scrollable: find.byType(Scrollable).first,
     );
-    await tester.drag(find.byType(CustomScrollView).first, const Offset(0, -260));
+    await tester.ensureVisible(find.text('Gerenciar'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Gerenciar'));
     await tester.pumpAndSettle();
@@ -43,7 +43,7 @@ void main() {
       300,
       scrollable: find.byType(Scrollable).first,
     );
-    await tester.drag(find.byType(CustomScrollView).first, const Offset(0, -260));
+    await tester.ensureVisible(find.text('Gerenciar'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Gerenciar'));
     await tester.pumpAndSettle();

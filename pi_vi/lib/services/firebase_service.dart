@@ -85,4 +85,15 @@ class FirebaseService {
 
     return documento.data();
   }
+
+  static Future<void> atualizarCidadeCasa(String cidade) async {
+    final usuario = _auth.currentUser;
+    if (usuario == null) {
+      throw StateError('Faça login novamente para editar sua casa.');
+    }
+
+    await _db.collection('usuarios').doc(usuario.uid).set({
+      'cidade': cidade.trim(),
+    }, SetOptions(merge: true));
+  }
 }

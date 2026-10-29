@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'automacao.dart';
+import 'dispositivo.dart';
+import 'perfil.dart';
+import '../widgets/cos_app_navigation.dart';
 
 const Color _bg = Color(0xFF080B0F);
 const Color _panel = Color(0xFF10151B);
@@ -7,7 +11,6 @@ const Color _border = Color(0xFF293640);
 const Color _muted = Color(0xFF8A98A5);
 const Color _fg = Color(0xFFF1F5F8);
 const Color _mint = Color(0xFF4FE0C0);
-
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -48,6 +51,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       local: 'Sala de estar',
       icone: Icons.ac_unit_rounded,
       ligado: false,
+      online: false,
     ),
     _DeviceData(
       nome: 'Luz do quarto',
@@ -76,6 +80,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   ];
 
   final List<_AtalhoData> _atalhosSalvos = [];
+  final AutomacaoData _automacaoData = AutomacaoData();
 
   @override
   void initState() {
@@ -117,6 +122,132 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final quantidade = ambiente.dispositivos.length;
     if (quantidade == 0) return 'Nenhum dispositivo';
     return '$quantidade ${quantidade == 1 ? 'dispositivo' : 'dispositivos'}';
+  }
+
+  Future<void> _selecionarAba(int index) async {
+    Navigator.of(context).popUntil((route) => route.isFirst);
+    switch (index) {
+      case 0:
+        return;
+      case 1:
+        await Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => DispositivoScreen(
+              dispositivos: _dispositivos
+                  .map(
+                    (device) => DispositivoListaItem(
+                      nome: device.nome,
+                      ambiente: device.local,
+                      icone: device.icone,
+                      ligado: device.ligado,
+                      online: device.online,
+                    ),
+                  )
+                  .toList(),
+              ambientes: _ambientes.map((room) => room.nome).toList(),
+              onToggle: (name) {
+                final device = _dispositivos.firstWhere(
+                  (item) => item.nome == name,
+                );
+                setState(() => device.ligado = !device.ligado);
+              },
+              onAddDevice: (item) {
+                setState(() {
+                  _dispositivos.add(
+                    _DeviceData(
+                      nome: item.nome,
+                      local: item.ambiente,
+                      icone: item.icone,
+                      ligado: item.ligado,
+                      online: item.online,
+                    ),
+                  );
+                  if (item.ambiente != 'Sem ambiente') {
+                    final room = _ambientes.firstWhere(
+                      (room) => room.nome == item.ambiente,
+                    );
+                    room.dispositivos.add(item.nome);
+                  }
+                });
+              },
+              onNavigate: (selectedIndex) {
+                if (selectedIndex != 1) {
+                  _selecionarAba(selectedIndex);
+                }
+              },
+            ),
+          ),
+        );
+      case 2:
+        await Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => AutomacaoScreen(
+              data: _automacaoData,
+              devices: _dispositivos
+                  .where(
+                    (device) =>
+                        device.icone == Icons.lightbulb_outline_rounded ||
+                        device.icone == Icons.power_rounded ||
+                        device.icone == Icons.electrical_services_outlined,
+                  )
+                  .map(
+                    (device) => AutomacaoDevice(
+                      id: device.id,
+                      name: device.nome,
+                      location: device.local,
+                      type: device.icone == Icons.lightbulb_outline_rounded
+                          ? AutomacaoDeviceType.lampada
+                          : AutomacaoDeviceType.tomada,
+                      online: device.online,
+                      isOn: device.ligado,
+                    ),
+                  )
+                  .toList(),
+              onPowerChanged: (deviceId, enabled) {
+                final device = _dispositivos.firstWhere(
+                  (item) => item.id == deviceId,
+                );
+                setState(() => device.ligado = enabled);
+              },
+              onNavigate: (selectedIndex) {
+                if (selectedIndex != 2) {
+                  _selecionarAba(selectedIndex);
+                }
+              },
+            ),
+          ),
+        );
+      case 3:
+        _mostrarMensagem('Você não tem alertas novos.');
+      case 4:
+        await Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => PerfilScreen(
+              ambientesCasa: _ambientes.map((ambiente) {
+                final quantidade = ambiente.dispositivos.length;
+                if (quantidade == 0) {
+                  return '${ambiente.nome} — sem dispositivos';
+                }
+                final rotulo = quantidade == 1 ? 'dispositivo' : 'dispositivos';
+                return '${ambiente.nome} — $quantidade $rotulo: '
+                    '${ambiente.dispositivos.join(', ')}';
+              }).toList(),
+              dispositivosCasa: _dispositivos
+                  .map(
+                    (dispositivo) =>
+                        '${dispositivo.nome} — ${dispositivo.local}; '
+                        '${dispositivo.ligado ? 'Ligado' : 'Desligado'}',
+                  )
+                  .toList(),
+              onNavigate: (selectedIndex) {
+                if (selectedIndex != 4) {
+                  _selecionarAba(selectedIndex);
+                }
+              },
+            ),
+          ),
+        );
+    }
   }
 
   Future<void> _gerenciarAmbientes() async {
@@ -885,9 +1016,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     'Dispositivos',
                     '$_dispositivosLigados de ${_dispositivos.length} ligados',
                     acao: 'Ver todos',
-                    onAcao: () => _mostrarMensagem(
-                      'Você está vendo os dispositivos cadastrados nesta demonstração.',
-                    ),
+                    onAcao: () => _selecionarAba(1),
                   ),
                   const SizedBox(height: 14),
                   _gradeDispositivos(),
@@ -930,59 +1059,34 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ],
         ),
       ),
-      bottomNavigationBar: _barraNavegacao(),
+      bottomNavigationBar: CosAppNavigation(
+        selectedIndex: 0,
+        onSelected: (index) {
+          if (index != 0) _selecionarAba(index);
+        },
+      ),
     );
   }
 
   Widget _cabecalho() {
-    return Row(
-      children: [
-        Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            color: _mint.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: _mint.withValues(alpha: 0.25)),
+    return CosAppHeader(
+      title: 'Início',
+      subtitle: 'CASA INTELIGENTE',
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            tooltip: 'Alertas',
+            onPressed: () => _selecionarAba(3),
+            icon: const Icon(Icons.notifications_none_rounded, color: _fg),
           ),
-          child: const Icon(Icons.home_rounded, color: _mint, size: 25),
-        ),
-        const SizedBox(width: 12),
-        const Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'COS',
-              style: TextStyle(
-                color: _fg,
-                fontSize: 18,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 1.5,
-              ),
-            ),
-            Text(
-              'CASA INTELIGENTE',
-              style: TextStyle(color: _muted, fontSize: 9, letterSpacing: 1.2),
-            ),
-          ],
-        ),
-        const Spacer(),
-        IconButton(
-          tooltip: 'Notificações',
-          onPressed: () => _mostrarMensagem('Você não tem novas notificações.'),
-          icon: const Icon(Icons.notifications_none_rounded, color: _fg),
-        ),
-        Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: _panel2,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: _border),
+          IconButton(
+            tooltip: 'Perfil',
+            onPressed: () => _selecionarAba(4),
+            icon: const Icon(Icons.person_outline_rounded, color: _fg),
           ),
-          child: const Icon(Icons.person_outline_rounded, color: _fg),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -1412,65 +1516,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return '$ambientes ${ambientes == 1 ? 'ambiente' : 'ambientes'} • '
         '$dispositivos ${dispositivos == 1 ? 'dispositivo' : 'dispositivos'}';
   }
-
-  Widget _barraNavegacao() {
-    return Container(
-      decoration: const BoxDecoration(
-        color: _panel,
-        border: Border(top: BorderSide(color: _border)),
-      ),
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _NavItem(
-                icone: Icons.grid_view_rounded,
-                titulo: 'Início',
-                selecionado: true,
-                onTap: () {},
-              ),
-              _NavItem(
-                icone: Icons.devices_other_rounded,
-                titulo: 'Dispositivos',
-                onTap: () => _mostrarMensagem(
-                  'A lista de dispositivos já aparece nesta tela.',
-                ),
-              ),
-              _NavItem(
-                icone: Icons.auto_awesome_outlined,
-                titulo: 'Rotinas',
-                onTap: _novoAtalho,
-              ),
-              _NavItem(
-                icone: Icons.settings_outlined,
-                titulo: 'Ajustes',
-                onTap: () => _mostrarMensagem(
-                  'As configurações ainda serão implementadas.',
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 class _DeviceData {
+  static int _nextId = 0;
+
+  final String id;
   final String nome;
   String local;
   final IconData icone;
   bool ligado;
+  final bool online;
 
   _DeviceData({
+    String? id,
     required this.nome,
     required this.local,
     required this.icone,
     required this.ligado,
-  });
+    this.online = true,
+  }) : id = id ?? 'device-${_nextId++}';
 }
 
 class _DeviceCard extends StatelessWidget {
@@ -1651,48 +1716,6 @@ class _ShortcutCard extends StatelessWidget {
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(color: _muted, fontSize: 10, height: 1.4),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _NavItem extends StatelessWidget {
-  final IconData icone;
-  final String titulo;
-  final bool selecionado;
-  final VoidCallback onTap;
-
-  const _NavItem({
-    required this.icone,
-    required this.titulo,
-    this.selecionado = false,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final cor = selecionado ? _mint : _muted;
-
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icone, color: cor, size: 21),
-            const SizedBox(height: 4),
-            Text(
-              titulo,
-              style: TextStyle(
-                color: cor,
-                fontSize: 9,
-                fontWeight: selecionado ? FontWeight.w800 : FontWeight.w500,
-              ),
             ),
           ],
         ),
