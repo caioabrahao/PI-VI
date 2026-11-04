@@ -1,9 +1,18 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+
 import 'package:firebase_auth/firebase_auth.dart';
 
 import '../services/firebase_service.dart';
 import 'login.dart';
-import 'dashboard.dart';
+
+const Color bg = Color(0xFF080B0F);
+const Color panel = Color(0xFF10151B);
+const Color panel2 = Color(0xFF171E26);
+const Color border = Color(0xFF293640);
+const Color muted = Color(0xFF8A98A5);
+const Color fg = Color(0xFFF1F5F8);
+const Color mint = Color(0xFF4FE0C0);
 
 class CadastroScreen extends StatefulWidget {
   const CadastroScreen({super.key});
@@ -48,18 +57,17 @@ class _CadastroScreenState extends State<CadastroScreen> {
           return 'A senha é muito fraca. Use pelo menos 6 caracteres.';
         case 'network-request-failed':
           return 'Sem conexão. Verifique sua internet.';
-        case 'operation-not-allowed':
-          return 'Ative o método E-mail/senha no Firebase Authentication.';
         default:
           return 'Não foi possível criar a conta (${erro.code}).';
       }
     }
-
-    return 'Não foi possível salvar os dados. Verifique sua conexão e tente novamente.';
+    return 'Não foi possível salvar os dados. Tente novamente.';
   }
 
   Future<void> criarConta() async {
-    if (!form.currentState!.validate()) return;
+    if (!form.currentState!.validate()) {
+      return;
+    }
 
     if (!aceitou) {
       mensagem('Aceite os termos para continuar.');
@@ -75,19 +83,50 @@ class _CadastroScreenState extends State<CadastroScreen> {
         senha: senha.text,
       );
 
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
-      mensagem('Conta criada com sucesso!');
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: panel2,
+          title: const Text(
+            'Confirme o seu e-mail',
+            style: TextStyle(color: fg),
+          ),
+          content: Text(
+            'Enviamos um link de confirmação para ${email.text}. Acesse a sua caixa de entrada e clique no link para ativar a sua conta.',
+            style: const TextStyle(color: muted, fontSize: 13),
+          ),
+          actions: [
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: mint,
+                foregroundColor: bg,
+              ),
+              child: const Text('OK, ir para o login'),
+            ),
+          ],
+        ),
+      );
 
-      Navigator.pushAndRemoveUntil(
+      if (!mounted) {
+        return;
+      }
+
+      Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => const DashboardScreen()),
-        (_) => false,
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
       );
     } catch (e) {
       mensagem(erroCadastro(e));
     } finally {
-      if (mounted) setState(() => carregando = false);
+      if (mounted) {
+        setState(() => carregando = false);
+      }
     }
   }
 
@@ -117,12 +156,15 @@ class _CadastroScreenState extends State<CadastroScreen> {
                           ),
                         ),
                         const SizedBox(width: 12),
-                        const Text(
-                          'Criar conta',
-                          style: TextStyle(
-                            color: fg,
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
+                        const Expanded(
+                          child: Text(
+                            'Criar conta',
+                            style: TextStyle(
+                              color: fg,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                            ),
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ],
@@ -149,9 +191,13 @@ class _CadastroScreenState extends State<CadastroScreen> {
                       nome,
                       Icons.person_outline,
                       'Seu nome',
-                      validator: (v) => v == null || v.trim().isEmpty
-                          ? 'Informe seu nome.'
-                          : null,
+                      autofillHints: const [AutofillHints.name],
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) {
+                          return 'Informe seu nome.';
+                        }
+                        return null;
+                      },
                     ),
                     const SizedBox(height: 14),
 
@@ -162,9 +208,13 @@ class _CadastroScreenState extends State<CadastroScreen> {
                       Icons.mail_outline,
                       'voce@exemplo.com',
                       teclado: TextInputType.emailAddress,
-                      validator: (v) => v == null || !v.contains('@')
-                          ? 'Informe um e-mail válido.'
-                          : null,
+                      autofillHints: const [AutofillHints.email],
+                      validator: (v) {
+                        if (v == null || !v.contains('@')) {
+                          return 'Informe um e-mail válido.';
+                        }
+                        return null;
+                      },
                     ),
                     const SizedBox(height: 14),
 
@@ -175,6 +225,7 @@ class _CadastroScreenState extends State<CadastroScreen> {
                       Icons.lock_outline,
                       'Mínimo de 6 caracteres',
                       ocultar: !mostrarSenha,
+                      autofillHints: const [AutofillHints.newPassword],
                       sufixo: IconButton(
                         onPressed: () {
                           setState(() => mostrarSenha = !mostrarSenha);
@@ -186,13 +237,15 @@ class _CadastroScreenState extends State<CadastroScreen> {
                           color: muted,
                         ),
                       ),
-                      validator: (v) => v == null || v.length < 6
-                          ? 'Use pelo menos 6 caracteres.'
-                          : null,
+                      validator: (v) {
+                        if (v == null || v.length < 6) {
+                          return 'Use pelo menos 6 caracteres.';
+                        }
+                        return null;
+                      },
                     ),
                     const SizedBox(height: 14),
 
-                    // NOVO CAMPO: CONFIRMAR SENHA
                     _label('Confirmar senha'),
                     const SizedBox(height: 7),
                     _campo(
@@ -204,11 +257,9 @@ class _CadastroScreenState extends State<CadastroScreen> {
                         if (v == null || v.isEmpty) {
                           return 'Confirme sua senha.';
                         }
-
                         if (v != senha.text) {
                           return 'As senhas não coincidem.';
                         }
-
                         return null;
                       },
                     ),
@@ -217,9 +268,7 @@ class _CadastroScreenState extends State<CadastroScreen> {
                     CheckboxListTile(
                       contentPadding: EdgeInsets.zero,
                       value: aceitou,
-                      onChanged: (v) {
-                        setState(() => aceitou = v ?? false);
-                      },
+                      onChanged: (v) => setState(() => aceitou = v ?? false),
                       activeColor: mint,
                       checkColor: bg,
                       controlAffinity: ListTileControlAffinity.leading,
@@ -262,30 +311,29 @@ class _CadastroScreenState extends State<CadastroScreen> {
                     const SizedBox(height: 16),
 
                     Center(
-                      child: Wrap(
-                        alignment: WrapAlignment.center,
-                        children: [
-                          const Text(
-                            'Já tem conta? ',
-                            style: TextStyle(color: muted, fontSize: 12),
-                          ),
-                          GestureDetector(
-                            onTap: () => Navigator.pushReplacement(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const LoginScreen(),
-                              ),
-                            ),
-                            child: const Text(
-                              'Entrar',
-                              style: TextStyle(
+                      child: Text.rich(
+                        TextSpan(
+                          text: 'Já tem conta? ',
+                          style: const TextStyle(color: muted, fontSize: 12),
+                          children: [
+                            TextSpan(
+                              text: 'Entrar',
+                              style: const TextStyle(
                                 color: mint,
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
                               ),
+                              recognizer: TapGestureRecognizer()
+                                ..onTap = () => Navigator.pushReplacement(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const LoginScreen(),
+                                  ),
+                                ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
+                        textAlign: TextAlign.center,
                       ),
                     ),
                   ],
@@ -317,12 +365,14 @@ Widget _campo(
   bool ocultar = false,
   Widget? sufixo,
   TextInputType? teclado,
+  Iterable<String>? autofillHints,
   String? Function(String?)? validator,
 }) {
   return TextFormField(
     controller: controller,
     obscureText: ocultar,
     keyboardType: teclado,
+    autofillHints: autofillHints,
     validator: validator,
     style: const TextStyle(color: fg, fontSize: 14),
     decoration: InputDecoration(

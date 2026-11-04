@@ -1,8 +1,17 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
+import '../models/dispositivo_iot.dart';
+import '../services/dispositivo_iot_service.dart';
 import '../widgets/cos_app_navigation.dart';
 
+// =====================================================
+// MODELO UTILIZADO PELA DASHBOARD
+// =====================================================
+
 class DispositivoListaItem {
+  final String? id;
   final String nome;
   final String ambiente;
   final IconData icone;
@@ -10,6 +19,7 @@ class DispositivoListaItem {
   final bool online;
 
   const DispositivoListaItem({
+    this.id,
     required this.nome,
     required this.ambiente,
     required this.icone,
@@ -18,11 +28,15 @@ class DispositivoListaItem {
   });
 }
 
+// =====================================================
+// TELA PRINCIPAL DOS DISPOSITIVOS
+// =====================================================
+
 class DispositivoScreen extends StatefulWidget {
   final List<DispositivoListaItem> dispositivos;
   final List<String> ambientes;
   final ValueChanged<String> onToggle;
-  final ValueChanged<DispositivoListaItem> onAddDevice;
+  final Future<void> Function(DispositivoListaItem) onAddDevice;
   final ValueChanged<int> onNavigate;
 
   const DispositivoScreen({
@@ -39,225 +53,511 @@ class DispositivoScreen extends StatefulWidget {
 }
 
 class _DispositivoScreenState extends State<DispositivoScreen> {
-  late final List<_DeviceItemState> _devices;
-  final _searchController = TextEditingController();
-  String _search = '';
-  String _filter = 'Todos';
-  bool _sortAscending = false;
+  List<DispositivoIot> _dispositivos = [];
+
+  StreamSubscription<List<DispositivoIot>>? _assinatura;
+
+  final TextEditingController _buscaController = TextEditingController();
+
+  String _busca = '';
+  String _filtro = 'Todos';
+  bool _ordenarAZ = false;
+  bool _carregando = true;
+  bool _cadastrando = false;
+  String? _erro;
+
+  static const Color _bg = Color(0xFF080B0F);
+  static const Color _panel = Color(0xFF10151B);
+  static const Color _panel2 = Color(0xFF171E26);
+  static const Color _border = Color(0xFF293640);
+  static const Color _mint = Color(0xFF4FE0C0);
+  static const Color _fg = Color(0xFFF1F5F8);
+  static const Color _muted = Color(0xFF8A98A5);
+
+  // =====================================================
+  // INICIALIZAÇÃO
+  // =====================================================
 
   @override
   void initState() {
     super.initState();
-    _devices = widget.dispositivos
-        .map(_DeviceItemState.fromItem)
-        .toList(growable: true);
+    _carregarDispositivos();
+  }
+
+  void _carregarDispositivos() {
+    try {
+      _assinatura = DispositivoIotService.observarDispositivos().listen(
+        (dispositivos) {
+          if (!mounted) return;
+
+          setState(() {
+            _dispositivos = dispositivos;
+            _carregando = false;
+            _erro = null;
+          });
+        },
+        onError: (Object erro) {
+          if (!mounted) return;
+
+          setState(() {
+            _carregando = false;
+            _erro = erro.toString();
+          });
+        },
+      );
+    } catch (e) {
+      _carregando = false;
+      _erro = e.toString();
+    }
   }
 
   @override
   void dispose() {
-    _searchController.dispose();
+    _assinatura?.cancel();
+    _buscaController.dispose();
     super.dispose();
   }
 
-  int get _onlineCount => _devices.where((device) => device.online).length;
+  // =====================================================
+  // INFORMAÇÕES DOS DISPOSITIVOS
+  // =====================================================
 
-  List<String> get _filters {
-    final rooms =
-        _devices
-            .map((device) => device.ambiente)
-            .where((room) => room != 'Sem ambiente')
+  int get _totalDispositivos => _dispositivos.length;
+
+  int get _dispositivosOnline =>
+      _dispositivos.where((d) => d.statusConexao == 'conectado').length;
+
+  int get _dispositivosLigados => _dispositivos.where((d) => d.ligado).length;
+
+  String _ambiente(DispositivoIot d) {
+    final nome = d.ambienteId?.trim();
+
+    if (nome == null || nome.isEmpty) {
+      return 'Sem ambiente';
+    }
+
+    return nome;
+  }
+
+  IconData _iconeDispositivo(DispositivoIot d) {
+    final tipo = d.tipo.toLowerCase();
+
+    if (tipo.contains('luz') ||
+        tipo.contains('lampada') ||
+        tipo.contains('lâmpada')) {
+      return Icons.lightbulb_outline_rounded;
+    }
+
+    if (tipo.contains('tomada')) {
+      return Icons.power_rounded;
+    }
+
+    if (tipo.contains('ar-condicionado') || tipo.contains('clima')) {
+      return Icons.ac_unit_rounded;
+    }
+
+    if (tipo.contains('tv') || tipo.contains('televisão')) {
+      return Icons.tv_rounded;
+    }
+
+    if (tipo.contains('ventilador')) {
+      return Icons.air_rounded;
+    }
+
+    return Icons.devices_other_rounded;
+  }
+
+  bool _ehIluminacao(DispositivoIot d) {
+    final tipo = d.tipo.toLowerCase();
+
+    return tipo.contains('lampada') ||
+        tipo.contains('lâmpada') ||
+        tipo.contains('luz') ||
+        d.nome.toLowerCase().contains('luz');
+  }
+
+  // =====================================================
+  // FILTROS
+  // =====================================================
+
+  List<String> get _filtros {
+    final ambientes =
+        _dispositivos
+            .map(_ambiente)
+            .where((nome) => nome != 'Sem ambiente')
             .toSet()
             .toList()
           ..sort();
-    return ['Todos', 'Offline', 'Iluminação', ...rooms];
+
+    return ['Todos', 'Online', 'Offline', 'Iluminação', ...ambientes];
   }
 
-  List<_DeviceItemState> get _visibleDevices {
-    final query = _search.trim().toLowerCase();
-    final visible = _devices.where((device) {
-      final matchesSearch =
-          query.isEmpty ||
-          device.nome.toLowerCase().contains(query) ||
-          device.ambiente.toLowerCase().contains(query);
-      final matchesFilter = switch (_filter) {
-        'Todos' => true,
-        'Iluminação' => _isLight(device),
-        'Offline' => !device.online,
-        _ => device.ambiente == _filter,
-      };
-      return matchesSearch && matchesFilter;
+  List<DispositivoIot> get _dispositivosFiltrados {
+    final busca = _busca.trim().toLowerCase();
+
+    final resultado = _dispositivos.where((dispositivo) {
+      final correspondeBusca =
+          busca.isEmpty ||
+          dispositivo.nome.toLowerCase().contains(busca) ||
+          _ambiente(dispositivo).toLowerCase().contains(busca) ||
+          dispositivo.tipo.toLowerCase().contains(busca);
+
+      bool correspondeFiltro;
+
+      switch (_filtro) {
+        case 'Todos':
+          correspondeFiltro = true;
+          break;
+
+        case 'Online':
+          correspondeFiltro = dispositivo.statusConexao == 'conectado';
+          break;
+
+        case 'Offline':
+          correspondeFiltro = dispositivo.statusConexao == 'desconectado';
+          break;
+
+        case 'Iluminação':
+          correspondeFiltro = _ehIluminacao(dispositivo);
+          break;
+
+        default:
+          correspondeFiltro = _ambiente(dispositivo) == _filtro;
+      }
+
+      return correspondeBusca && correspondeFiltro;
     }).toList();
-    if (_sortAscending) {
-      visible.sort(
+
+    if (_ordenarAZ) {
+      resultado.sort(
         (a, b) => a.nome.toLowerCase().compareTo(b.nome.toLowerCase()),
       );
     }
-    return visible;
+
+    return resultado;
   }
 
-  bool _isLight(_DeviceItemState device) =>
-      device.icone == Icons.lightbulb_outline_rounded ||
-      device.nome.toLowerCase().contains('luz') ||
-      device.nome.toLowerCase().contains('lâmpada');
+  // =====================================================
+  // CADASTRAR NOVO DISPOSITIVO
+  // =====================================================
 
   Future<void> _adicionarDispositivo() async {
-    final rooms = widget.ambientes.isEmpty
-        ? ['Sem ambiente']
-        : [...widget.ambientes, 'Sem ambiente'];
-    final item = await Navigator.of(context).push<DispositivoListaItem>(
+    if (_cadastrando) return;
+
+    final ambientes = [...widget.ambientes, 'Sem ambiente'].toList();
+
+    final item = await Navigator.push<DispositivoListaItem>(
+      context,
       MaterialPageRoute(
         builder: (_) => AdicionarDispositivoScreen(
-          ambientes: rooms,
-          nomesExistentes: _devices.map((device) => device.nome).toSet(),
+          ambientes: ambientes,
+          nomesExistentes: _dispositivos.map((d) => d.nome).toSet(),
         ),
       ),
     );
+
     if (item == null || !mounted) return;
-    widget.onAddDevice(item);
-    setState(() {
-      _devices.add(_DeviceItemState.fromItem(item));
-      _filter = 'Todos';
-      _search = '';
-      _searchController.clear();
-    });
+
+    setState(() => _cadastrando = true);
+
+    try {
+      await widget.onAddDevice(item);
+
+      if (!mounted) return;
+
+      setState(() {
+        _filtro = 'Todos';
+        _busca = '';
+        _buscaController.clear();
+      });
+
+      _mensagem('Dispositivo cadastrado com sucesso!');
+    } catch (e) {
+      _mensagem('Erro ao cadastrar dispositivo: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _cadastrando = false);
+      }
+    }
   }
+
+  // =====================================================
+  // LIGAR / DESLIGAR
+  // =====================================================
+
+  Future<void> _alterarEstado(DispositivoIot dispositivo, bool ligado) async {
+    try {
+      await DispositivoIotService.alterarEstado(
+        id: dispositivo.id,
+        ligado: ligado,
+      );
+    } catch (e) {
+      _mensagem('Erro ao alterar dispositivo: $e');
+    }
+  }
+
+  // =====================================================
+  // EXCLUIR DISPOSITIVO
+  // =====================================================
+
+  Future<void> _excluirDispositivo(DispositivoIot dispositivo) async {
+    final confirmar = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: _panel,
+        title: const Text('Excluir dispositivo?', style: TextStyle(color: _fg)),
+        content: Text(
+          'Deseja excluir "${dispositivo.nome}" da sua casa?',
+          style: const TextStyle(color: _muted),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text(
+              'Excluir',
+              style: TextStyle(color: Colors.redAccent),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmar != true || !mounted) return;
+
+    try {
+      await DispositivoIotService.excluir(dispositivo.id);
+
+      _mensagem('Dispositivo excluído com sucesso!');
+    } catch (e) {
+      _mensagem('Erro ao excluir dispositivo: $e');
+    }
+  }
+
+  // =====================================================
+  // EDITAR DISPOSITIVO
+  // =====================================================
+
+  Future<void> _editarDispositivo(DispositivoIot dispositivo) async {
+    final nomeController = TextEditingController(text: dispositivo.nome);
+
+    final identificadorController = TextEditingController(
+      text: dispositivo.identificador,
+    );
+
+    final tipoController = TextEditingController(text: dispositivo.tipo);
+
+    String ambienteSelecionado = _ambiente(dispositivo);
+
+    final ambientes = [
+      ...widget.ambientes,
+      'Sem ambiente',
+      ambienteSelecionado,
+    ].toList();
+
+    final salvar = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              backgroundColor: _panel,
+              title: const Text(
+                'Editar dispositivo',
+                style: TextStyle(color: _fg),
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: nomeController,
+                      style: const TextStyle(color: _fg),
+                      decoration: const InputDecoration(labelText: 'Nome'),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: identificadorController,
+                      style: const TextStyle(color: _fg),
+                      decoration: const InputDecoration(
+                        labelText: 'Identificador',
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: tipoController,
+                      style: const TextStyle(color: _fg),
+                      decoration: const InputDecoration(labelText: 'Tipo'),
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      initialValue: ambienteSelecionado,
+                      dropdownColor: _panel2,
+                      decoration: const InputDecoration(labelText: 'Ambiente'),
+                      items: ambientes.map((ambiente) {
+                        return DropdownMenuItem(
+                          value: ambiente,
+                          child: Text(ambiente),
+                        );
+                      }).toList(),
+                      onChanged: (valor) {
+                        if (valor != null) {
+                          setDialogState(() {
+                            ambienteSelecionado = valor;
+                          });
+                        }
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext, false),
+                  child: const Text('Cancelar'),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(dialogContext, true),
+                  child: const Text('Salvar'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    final nome = nomeController.text.trim();
+    final identificador = identificadorController.text.trim();
+    final tipo = tipoController.text.trim();
+
+    nomeController.dispose();
+    identificadorController.dispose();
+    tipoController.dispose();
+
+    if (salvar != true || !mounted) return;
+
+    try {
+      await DispositivoIotService.atualizarCadastro(
+        id: dispositivo.id,
+        nome: nome,
+        identificador: identificador,
+        tipo: tipo,
+        ambienteId: ambienteSelecionado == 'Sem ambiente'
+            ? null
+            : ambienteSelecionado,
+      );
+
+      _mensagem('Dispositivo atualizado!');
+    } catch (e) {
+      _mensagem('Erro ao atualizar dispositivo: $e');
+    }
+  }
+
+  // =====================================================
+  // MENSAGENS
+  // =====================================================
+
+  void _mensagem(String texto) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(texto),
+        backgroundColor: _panel2,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  // =====================================================
+  // BUILD PRINCIPAL
+  // =====================================================
 
   @override
   Widget build(BuildContext context) {
-    final visibleDevices = _visibleDevices;
+    final visiveis = _dispositivosFiltrados;
+
     return Scaffold(
-      backgroundColor: cosBackground,
+      backgroundColor: _bg,
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 600),
-            child: CustomScrollView(
-              slivers: [
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
-                  sliver: SliverList(
-                    delegate: SliverChildListDelegate([
-                      CosAppHeader(
-                        title: 'Dispositivos',
-                        subtitle:
-                            '$_onlineCount online · ${_devices.length - _onlineCount} offline',
-                        trailing: IconButton(
-                          tooltip: 'Adicionar dispositivo',
-                          onPressed: _adicionarDispositivo,
-                          icon: const Icon(
-                            Icons.add_rounded,
-                            color: cosForeground,
-                          ),
-                          style: IconButton.styleFrom(
-                            backgroundColor: cosPanelElevated,
-                            fixedSize: const Size(44, 44),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      TextField(
-                        controller: _searchController,
-                        onChanged: (value) => setState(() => _search = value),
-                        decoration: InputDecoration(
-                          hintText: 'Buscar por nome ou ambiente',
-                          prefixIcon: const Icon(Icons.search_rounded),
-                          suffixIcon: IconButton(
-                            tooltip: 'Limpar busca',
-                            onPressed: _search.isEmpty
-                                ? null
-                                : () {
-                                    _searchController.clear();
-                                    setState(() => _search = '');
-                                  },
-                            icon: const Icon(Icons.tune_rounded),
-                          ),
-                          filled: true,
-                          fillColor: cosPanel,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(14),
-                            borderSide: const BorderSide(color: cosBorder),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(14),
-                            borderSide: const BorderSide(color: cosBorder),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                      SizedBox(
-                        height: 34,
-                        child: ListView(
-                          scrollDirection: Axis.horizontal,
-                          children: [
-                            for (final filter in _filters)
-                              Padding(
-                                padding: const EdgeInsets.only(right: 7),
-                                child: _FilterChip(
-                                  label: filter == 'Todos'
-                                      ? 'Todos · ${_devices.length}'
-                                      : filter == 'Offline'
-                                      ? 'Offline · ${_devices.where((device) => !device.online).length}'
-                                      : filter,
-                                  selected: _filter == filter,
-                                  onTap: () => setState(() => _filter = filter),
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      Row(
-                        children: [
-                          const Expanded(
-                            child: Text(
-                              'Casa do Paulo',
-                              style: TextStyle(
-                                color: cosForeground,
-                                fontSize: 15,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ),
-                          TextButton(
-                            onPressed: () => setState(
-                              () => _sortAscending = !_sortAscending,
-                            ),
-                            style: TextButton.styleFrom(
-                              foregroundColor: cosMint,
-                            ),
-                            child: Text(
-                              _sortAscending ? 'Ordenado A–Z' : 'Ordenar',
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      if (visibleDevices.isEmpty)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 36),
-                          child: Center(
-                            child: Text(
-                              _devices.isEmpty
-                                  ? 'Nenhum dispositivo cadastrado.'
-                                  : 'Nenhum dispositivo encontrado.',
-                              style: const TextStyle(color: cosMuted),
-                            ),
-                          ),
-                        )
-                      else
-                        for (final device in visibleDevices) ...[
-                          _DeviceTile(
-                            device: device,
-                            onToggle: (value) {
-                              setState(() => device.ligado = value);
-                              widget.onToggle(device.nome);
-                            },
-                          ),
-                          const SizedBox(height: 10),
-                        ],
-                    ]),
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
+              children: [
+                CosAppHeader(
+                  title: 'Dispositivos',
+                  subtitle:
+                      '$_dispositivosOnline online · '
+                      '${_totalDispositivos - _dispositivosOnline} '
+                      'não conectados',
+                  trailing: IconButton(
+                    tooltip: 'Adicionar dispositivo',
+                    onPressed: _cadastrando ? null : _adicionarDispositivo,
+                    icon: const Icon(Icons.add_rounded, color: _fg),
                   ),
                 ),
+
+                const SizedBox(height: 24),
+
+                _resumo(),
+
+                const SizedBox(height: 22),
+
+                _campoBusca(),
+
+                const SizedBox(height: 15),
+
+                _barraFiltros(),
+
+                const SizedBox(height: 22),
+
+                Row(
+                  children: [
+                    const Expanded(
+                      child: Text(
+                        'Minha casa',
+                        style: TextStyle(
+                          color: _fg,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        setState(() {
+                          _ordenarAZ = !_ordenarAZ;
+                        });
+                      },
+                      child: Text(
+                        _ordenarAZ ? 'Ordenado A–Z' : 'Ordenar',
+                        style: const TextStyle(color: _mint),
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 12),
+
+                if (_carregando)
+                  const Padding(
+                    padding: EdgeInsets.all(40),
+                    child: Center(
+                      child: CircularProgressIndicator(color: _mint),
+                    ),
+                  )
+                else if (_erro != null)
+                  _estadoErro()
+                else if (visiveis.isEmpty)
+                  _estadoVazio()
+                else
+                  ...visiveis.map(_cardDispositivo),
               ],
             ),
           ),
@@ -269,84 +569,215 @@ class _DispositivoScreenState extends State<DispositivoScreen> {
       ),
     );
   }
-}
 
-class _DeviceItemState {
-  final String nome;
-  final String ambiente;
-  final IconData icone;
-  bool ligado;
-  final bool online;
+  // =====================================================
+  // RESUMO
+  // =====================================================
 
-  _DeviceItemState({
-    required this.nome,
-    required this.ambiente,
-    required this.icone,
-    required this.ligado,
-    required this.online,
-  });
-
-  factory _DeviceItemState.fromItem(DispositivoListaItem item) =>
-      _DeviceItemState(
-        nome: item.nome,
-        ambiente: item.ambiente,
-        icone: item.icone,
-        ligado: item.ligado,
-        online: item.online,
-      );
-}
-
-class _FilterChip extends StatelessWidget {
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  const _FilterChip({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: selected ? cosMint.withValues(alpha: 0.15) : cosPanelElevated,
-      borderRadius: BorderRadius.circular(20),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(20),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
-          child: Text(
-            label,
-            style: TextStyle(
-              color: selected ? cosMint : cosMuted,
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
+  Widget _resumo() {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: _panel,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: _border),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.devices_other_rounded, color: _mint, size: 32),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '$_totalDispositivos dispositivos',
+                  style: const TextStyle(
+                    color: _fg,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 17,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  '$_dispositivosLigados ligados',
+                  style: const TextStyle(color: _muted, fontSize: 12),
+                ),
+              ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  // =====================================================
+  // BUSCA
+  // =====================================================
+
+  Widget _campoBusca() {
+    return TextField(
+      controller: _buscaController,
+      onChanged: (valor) {
+        setState(() => _busca = valor);
+      },
+      decoration: InputDecoration(
+        hintText: 'Buscar por nome ou ambiente',
+        prefixIcon: const Icon(Icons.search_rounded),
+        suffixIcon: _busca.isNotEmpty
+            ? IconButton(
+                onPressed: () {
+                  _buscaController.clear();
+                  setState(() => _busca = '');
+                },
+                icon: const Icon(Icons.close),
+              )
+            : null,
+        filled: true,
+        fillColor: _panel,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: _border),
         ),
       ),
     );
   }
-}
 
-class _DeviceTile extends StatelessWidget {
-  final _DeviceItemState device;
-  final ValueChanged<bool> onToggle;
+  // =====================================================
+  // FILTROS
+  // =====================================================
 
-  const _DeviceTile({required this.device, required this.onToggle});
+  Widget _barraFiltros() {
+    return SizedBox(
+      height: 38,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        children: _filtros.map((filtro) {
+          final selecionado = _filtro == filtro;
 
-  @override
-  Widget build(BuildContext context) {
-    final statusColor = device.online ? cosMint : const Color(0xFFE45D72);
+          return Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: ChoiceChip(
+              label: Text(filtro),
+              selected: selecionado,
+              selectedColor: _mint.withValues(alpha: 0.18),
+              backgroundColor: _panel2,
+              labelStyle: TextStyle(
+                color: selecionado ? _mint : _muted,
+                fontSize: 11,
+              ),
+              side: BorderSide(color: selecionado ? _mint : _border),
+              onSelected: (_) {
+                setState(() {
+                  _filtro = filtro;
+                });
+              },
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  // =====================================================
+  // ESTADO VAZIO
+  // =====================================================
+
+  Widget _estadoVazio() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      padding: const EdgeInsets.all(28),
       decoration: BoxDecoration(
-        color: cosPanel,
-        borderRadius: BorderRadius.circular(17),
+        color: _panel,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: _border),
+      ),
+      child: Column(
+        children: [
+          const Icon(Icons.devices_other_rounded, color: _mint, size: 52),
+          const SizedBox(height: 16),
+          Text(
+            _dispositivos.isEmpty
+                ? 'Nenhum dispositivo cadastrado'
+                : 'Nenhum dispositivo encontrado',
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: _fg,
+              fontSize: 17,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            _dispositivos.isEmpty
+                ? 'Adicione seu primeiro dispositivo '
+                      'para começar a controlar sua casa.'
+                : 'Tente alterar os filtros ou a busca.',
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: _muted),
+          ),
+          if (_dispositivos.isEmpty) ...[
+            const SizedBox(height: 22),
+            ElevatedButton.icon(
+              onPressed: _cadastrando ? null : _adicionarDispositivo,
+              icon: const Icon(Icons.add),
+              label: const Text('Adicionar dispositivo'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _mint,
+                foregroundColor: _bg,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _estadoErro() {
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        children: [
+          const Icon(Icons.error_outline, color: Colors.redAccent, size: 42),
+          const SizedBox(height: 12),
+          Text(
+            'Erro ao carregar dispositivos:\n$_erro',
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: _fg),
+          ),
+          const SizedBox(height: 12),
+          TextButton(
+            onPressed: () {
+              _assinatura?.cancel();
+              setState(() {
+                _erro = null;
+                _carregando = true;
+              });
+              _carregarDispositivos();
+            },
+            child: const Text('Tentar novamente'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // =====================================================
+  // CARD DO DISPOSITIVO
+  // =====================================================
+
+  Widget _cardDispositivo(DispositivoIot dispositivo) {
+    final conectado = dispositivo.statusConexao == 'conectado';
+
+    final ligado = dispositivo.ligado;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(
+        color: _panel,
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: device.online ? cosBorder : const Color(0xFF382832),
+          color: ligado ? _mint.withValues(alpha: 0.4) : _border,
         ),
       ),
       child: Row(
@@ -355,180 +786,90 @@ class _DeviceTile extends StatelessWidget {
             width: 46,
             height: 46,
             decoration: BoxDecoration(
-              color: device.online
-                  ? cosMint.withValues(alpha: 0.13)
-                  : cosPanelElevated,
+              color: ligado ? _mint.withValues(alpha: 0.13) : _panel2,
               borderRadius: BorderRadius.circular(13),
             ),
             child: Icon(
-              device.icone,
-              color: device.online ? cosMint : cosMuted,
-              size: 22,
+              _iconeDispositivo(dispositivo),
+              color: ligado ? _mint : _muted,
+              size: 24,
             ),
           ),
+
           const SizedBox(width: 12),
+
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  device.nome,
+                  dispositivo.nome,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: device.online ? cosForeground : cosMuted,
-                    fontSize: 13,
+                  style: const TextStyle(
+                    color: _fg,
                     fontWeight: FontWeight.w700,
+                    fontSize: 13,
                   ),
                 ),
                 const SizedBox(height: 5),
                 Text(
-                  device.online
-                      ? '${device.ambiente} · ${device.ligado ? 'Ligado' : 'Desligado'}'
-                      : '${device.ambiente} · Sem resposta à rede Wi-Fi',
+                  '${_ambiente(dispositivo)} · '
+                  '${ligado ? 'Ligado' : 'Desligado'}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: cosMuted, fontSize: 10),
+                  style: const TextStyle(color: _muted, fontSize: 11),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  conectado
+                      ? 'Conectado'
+                      : dispositivo.statusConexao == 'desconectado'
+                      ? 'Desconectado'
+                      : 'Conexão desconhecida',
+                  style: TextStyle(
+                    color: conectado ? _mint : _muted,
+                    fontSize: 10,
+                  ),
                 ),
               ],
             ),
           ),
-          const SizedBox(width: 6),
-          Container(
-            width: 7,
-            height: 7,
-            decoration: BoxDecoration(
-              color: statusColor,
-              shape: BoxShape.circle,
-            ),
+
+          Switch.adaptive(
+            value: ligado,
+            onChanged: (valor) {
+              _alterarEstado(dispositivo, valor);
+            },
+            activeThumbColor: _mint,
           ),
-          if (device.online)
-            Switch.adaptive(
-              value: device.ligado,
-              onChanged: onToggle,
-              activeThumbColor: cosMint,
-              activeTrackColor: cosMint.withValues(alpha: 0.4),
-            )
-          else
-            Padding(
-              padding: const EdgeInsets.only(left: 8),
-              child: Text(
-                'OFFLINE',
-                style: TextStyle(
-                  color: statusColor,
-                  fontSize: 9,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ),
+
+          PopupMenuButton<String>(
+            tooltip: 'Opções do dispositivo',
+            icon: const Icon(Icons.more_vert, color: _muted),
+            onSelected: (opcao) {
+              if (opcao == 'editar') {
+                _editarDispositivo(dispositivo);
+              }
+
+              if (opcao == 'excluir') {
+                _excluirDispositivo(dispositivo);
+              }
+            },
+            itemBuilder: (context) => const [
+              PopupMenuItem(value: 'editar', child: Text('Editar')),
+              PopupMenuItem(value: 'excluir', child: Text('Excluir')),
+            ],
+          ),
         ],
       ),
     );
   }
 }
 
-class _NovoDispositivoDialog extends StatefulWidget {
-  final _DeviceCategory categoria;
-  final List<String> ambientes;
-  final Set<String> nomesExistentes;
-  final String nomeInicial;
-
-  const _NovoDispositivoDialog({
-    required this.categoria,
-    required this.ambientes,
-    required this.nomesExistentes,
-    required this.nomeInicial,
-  });
-
-  @override
-  State<_NovoDispositivoDialog> createState() => _NovoDispositivoDialogState();
-}
-
-class _NovoDispositivoDialogState extends State<_NovoDispositivoDialog> {
-  late final TextEditingController _controller;
-  final _formKey = GlobalKey<FormState>();
-  late String _ambiente;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = TextEditingController(text: widget.nomeInicial);
-    _ambiente = widget.ambientes.first;
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      backgroundColor: cosPanel,
-      title: Text('Adicionar ${widget.categoria.title.toLowerCase()}'),
-      content: Form(
-        key: _formKey,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                controller: _controller,
-                autofocus: true,
-                decoration: const InputDecoration(labelText: 'Nome'),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Informe o nome do dispositivo.';
-                  }
-                  if (widget.nomesExistentes.any(
-                    (name) => name.toLowerCase() == value.trim().toLowerCase(),
-                  )) {
-                    return 'Já existe um dispositivo com esse nome.';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                initialValue: _ambiente,
-                decoration: const InputDecoration(labelText: 'Ambiente'),
-                items: [
-                  for (final ambiente in widget.ambientes)
-                    DropdownMenuItem(value: ambiente, child: Text(ambiente)),
-                ],
-                onChanged: (value) {
-                  if (value != null) setState(() => _ambiente = value);
-                },
-              ),
-            ],
-          ),
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancelar'),
-        ),
-        FilledButton(
-          onPressed: () {
-            if (!_formKey.currentState!.validate()) return;
-            Navigator.pop(
-              context,
-              DispositivoListaItem(
-                nome: _controller.text.trim(),
-                ambiente: _ambiente,
-                icone: widget.categoria.icon,
-                ligado: false,
-              ),
-            );
-          },
-          child: const Text('Adicionar'),
-        ),
-      ],
-    );
-  }
-}
+// =====================================================
+// TELA DE CADASTRO DE DISPOSITIVOS
+// =====================================================
 
 class AdicionarDispositivoScreen extends StatefulWidget {
   final List<String> ambientes;
@@ -547,417 +888,209 @@ class AdicionarDispositivoScreen extends StatefulWidget {
 
 class _AdicionarDispositivoScreenState
     extends State<AdicionarDispositivoScreen> {
-  final _searchController = TextEditingController();
-  String _query = '';
+  final _formKey = GlobalKey<FormState>();
 
-  static const _categories = [
-    _DeviceCategory(
-      title: 'Iluminação',
-      description: 'Lâmpadas e fitas',
-      icon: Icons.lightbulb_outline_rounded,
-    ),
-    _DeviceCategory(
-      title: 'Tomada',
-      description: 'Switches e relés',
-      icon: Icons.electrical_services_outlined,
-    ),
-    _DeviceCategory(
-      title: 'Clima',
-      description: 'Ar e sensores',
-      icon: Icons.thermostat_outlined,
-    ),
-    _DeviceCategory(
-      title: 'Segurança',
-      description: 'Câmeras e trancas',
-      icon: Icons.shield_outlined,
-    ),
-    _DeviceCategory(
-      title: 'Hub / DIY',
-      description: 'Raspberry Pi e bridges',
-      icon: Icons.memory_rounded,
-    ),
-    _DeviceCategory(
-      title: 'Outros',
-      description: 'Mais dispositivos',
-      icon: Icons.dashboard_customize_outlined,
-    ),
+  final _nomeController = TextEditingController();
+
+  String _tipo = 'Lâmpada';
+  String _ambiente = 'Sem ambiente';
+
+  static const Color _bg = Color(0xFF080B0F);
+  static const Color _panel = Color(0xFF10151B);
+  static const Color _mint = Color(0xFF4FE0C0);
+  static const Color _fg = Color(0xFFF1F5F8);
+  static const Color _muted = Color(0xFF8A98A5);
+
+  final List<String> _tipos = [
+    'Lâmpada',
+    'Tomada',
+    'Ar-condicionado',
+    'TV',
+    'Ventilador',
+    'Outro',
   ];
 
   @override
   void dispose() {
-    _searchController.dispose();
+    _nomeController.dispose();
     super.dispose();
   }
 
-  List<_DeviceCategory> get _filteredCategories {
-    final query = _query.trim().toLowerCase();
-    if (query.isEmpty) return _categories;
-    return _categories.where((category) {
-      return category.title.toLowerCase().contains(query) ||
-          category.description.toLowerCase().contains(query);
-    }).toList();
-  }
-
-  Future<void> _selecionarCategoria(_DeviceCategory category) async {
-    final item = await showDialog<DispositivoListaItem>(
-      context: context,
-      builder: (_) => _NovoDispositivoDialog(
-        categoria: category,
-        ambientes: widget.ambientes,
-        nomesExistentes: widget.nomesExistentes,
-        nomeInicial: _query,
-      ),
-    );
-    if (item != null && mounted) {
-      Navigator.of(context).pop(item);
+  IconData get _icone {
+    switch (_tipo) {
+      case 'Lâmpada':
+        return Icons.lightbulb_outline_rounded;
+      case 'Tomada':
+        return Icons.power_rounded;
+      case 'Ar-condicionado':
+        return Icons.ac_unit_rounded;
+      case 'TV':
+        return Icons.tv_rounded;
+      case 'Ventilador':
+        return Icons.air_rounded;
+      default:
+        return Icons.devices_other_rounded;
     }
   }
 
-  Future<void> _mostrarBuscaProxima() async {
-    await showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: cosPanel,
-        title: const Text('Procurar por perto'),
-        content: const Text(
-          'A busca automática por Bluetooth ou Wi-Fi ainda não está '
-          'configurada. Escolha um tipo de dispositivo para cadastrá-lo '
-          'manualmente.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Fechar'),
-          ),
-          FilledButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _selecionarCategoria(_categories.last);
-            },
-            child: const Text('Adicionar manualmente'),
-          ),
-        ],
-      ),
-    );
-  }
+  void _salvar() {
+    if (!_formKey.currentState!.validate()) return;
 
-  Future<void> _mostrarAvisoQr() async {
-    await showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: cosPanel,
-        title: const Text('Adicionar por QR code'),
-        content: const Text(
-          'A leitura de QR code ainda não está disponível. Você pode '
-          'selecionar o tipo de dispositivo para cadastrá-lo manualmente.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Fechar'),
-          ),
-          FilledButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _selecionarCategoria(_categories.last);
-            },
-            child: const Text('Adicionar manualmente'),
-          ),
-        ],
-      ),
+    final dispositivo = DispositivoListaItem(
+      nome: _nomeController.text.trim(),
+      ambiente: _ambiente,
+      icone: _icone,
+      ligado: false,
+      online: false,
     );
+
+    Navigator.pop(context, dispositivo);
   }
 
   @override
   Widget build(BuildContext context) {
-    final categories = _filteredCategories;
+    final ambientes = [...widget.ambientes, 'Sem ambiente'].toList();
+
     return Scaffold(
-      backgroundColor: cosBackground,
-      body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 600),
-            child: CustomScrollView(
-              slivers: [
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(20, 18, 20, 28),
-                  sliver: SliverList(
-                    delegate: SliverChildListDelegate([
-                      Row(
-                        children: [
-                          IconButton(
-                            tooltip: 'Voltar',
-                            onPressed: () => Navigator.of(context).pop(),
-                            icon: const Icon(Icons.arrow_back_rounded),
-                            style: IconButton.styleFrom(
-                              backgroundColor: cosPanelElevated,
-                              fixedSize: const Size(44, 44),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          const Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Adicionar dispositivo',
-                                  style: TextStyle(
-                                    color: cosForeground,
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                                SizedBox(height: 3),
-                                Text(
-                                  'Escolha como deseja começar',
-                                  style: TextStyle(
-                                    color: cosMuted,
-                                    fontSize: 11,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      _NearbySearchCard(onTap: _mostrarBuscaProxima),
-                      const SizedBox(height: 16),
-                      TextField(
-                        controller: _searchController,
-                        onChanged: (value) => setState(() => _query = value),
-                        decoration: InputDecoration(
-                          hintText: 'Buscar marca ou modelo',
-                          prefixIcon: const Icon(Icons.search_rounded),
-                          filled: true,
-                          fillColor: cosPanel,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(14),
-                            borderSide: BorderSide.none,
-                          ),
+      backgroundColor: _bg,
+      appBar: AppBar(
+        title: const Text('Adicionar dispositivo'),
+        backgroundColor: _bg,
+        foregroundColor: _fg,
+      ),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 550),
+          child: ListView(
+            padding: const EdgeInsets.all(20),
+            children: [
+              const Icon(Icons.devices_other_rounded, color: _mint, size: 64),
+
+              const SizedBox(height: 15),
+
+              const Text(
+                'Novo dispositivo',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: _fg,
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+
+              const SizedBox(height: 8),
+
+              const Text(
+                'Preencha as informações para cadastrar '
+                'um dispositivo na sua casa.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: _muted),
+              ),
+
+              const SizedBox(height: 28),
+
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: _panel,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    children: [
+                      TextFormField(
+                        controller: _nomeController,
+                        style: const TextStyle(color: _fg),
+                        decoration: const InputDecoration(
+                          labelText: 'Nome do dispositivo',
+                          hintText: 'Ex.: Luz da sala',
+                          prefixIcon: Icon(Icons.edit_outlined),
                         ),
+                        validator: (valor) {
+                          final nome = valor?.trim() ?? '';
+
+                          if (nome.isEmpty) {
+                            return 'Informe o nome.';
+                          }
+
+                          if (nome.length > 80) {
+                            return 'Máximo de 80 caracteres.';
+                          }
+
+                          final existe = widget.nomesExistentes.any(
+                            (item) => item.toLowerCase() == nome.toLowerCase(),
+                          );
+
+                          if (existe) {
+                            return 'Já existe um dispositivo '
+                                'com esse nome.';
+                          }
+
+                          return null;
+                        },
                       ),
+
                       const SizedBox(height: 18),
-                      const Text(
-                        'Selecionar por tipo',
-                        style: TextStyle(
-                          color: cosForeground,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w800,
+
+                      DropdownButtonFormField<String>(
+                        initialValue: _tipo,
+                        dropdownColor: _panel,
+                        decoration: const InputDecoration(
+                          labelText: 'Tipo de dispositivo',
+                        ),
+                        items: _tipos.map((tipo) {
+                          return DropdownMenuItem(
+                            value: tipo,
+                            child: Text(tipo),
+                          );
+                        }).toList(),
+                        onChanged: (valor) {
+                          if (valor != null) {
+                            setState(() => _tipo = valor);
+                          }
+                        },
+                      ),
+
+                      const SizedBox(height: 18),
+
+                      DropdownButtonFormField<String>(
+                        initialValue: _ambiente,
+                        dropdownColor: _panel,
+                        decoration: const InputDecoration(
+                          labelText: 'Ambiente',
+                        ),
+                        items: ambientes.map((ambiente) {
+                          return DropdownMenuItem(
+                            value: ambiente,
+                            child: Text(ambiente),
+                          );
+                        }).toList(),
+                        onChanged: (valor) {
+                          if (valor != null) {
+                            setState(() => _ambiente = valor);
+                          }
+                        },
+                      ),
+
+                      const SizedBox(height: 28),
+
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: _salvar,
+                          icon: const Icon(Icons.add),
+                          label: const Text('Cadastrar dispositivo'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _mint,
+                            foregroundColor: _bg,
+                            padding: const EdgeInsets.all(16),
+                          ),
                         ),
                       ),
-                      const SizedBox(height: 10),
-                      if (categories.isEmpty)
-                        Column(
-                          children: [
-                            Padding(
-                              padding: const EdgeInsets.all(14),
-                              child: Text(
-                                'Nenhum tipo encontrado para "$_query".',
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(color: cosMuted),
-                              ),
-                            ),
-                            TextButton(
-                              onPressed: () =>
-                                  _selecionarCategoria(_categories.last),
-                              child: const Text('Adicionar em Outros'),
-                            ),
-                          ],
-                        )
-                      else
-                        LayoutBuilder(
-                          builder: (context, constraints) {
-                            final columns = constraints.maxWidth < 360 ? 1 : 2;
-                            return GridView.builder(
-                              shrinkWrap: true,
-                              physics: const NeverScrollableScrollPhysics(),
-                              itemCount: categories.length,
-                              gridDelegate:
-                                  SliverGridDelegateWithFixedCrossAxisCount(
-                                    crossAxisCount: columns,
-                                    crossAxisSpacing: 8,
-                                    mainAxisSpacing: 8,
-                                    mainAxisExtent: 92,
-                                  ),
-                              itemBuilder: (context, index) {
-                                final category = categories[index];
-                                return _CategoryCard(
-                                  category: category,
-                                  onTap: () => _selecionarCategoria(category),
-                                );
-                              },
-                            );
-                          },
-                        ),
-                      const SizedBox(height: 12),
-                      Center(
-                        child: Wrap(
-                          alignment: WrapAlignment.center,
-                          crossAxisAlignment: WrapCrossAlignment.center,
-                          children: [
-                            const Text(
-                              'Não encontrou? ',
-                              style: TextStyle(color: cosMuted, fontSize: 11),
-                            ),
-                            TextButton(
-                              onPressed: _mostrarAvisoQr,
-                              style: TextButton.styleFrom(
-                                foregroundColor: cosMint,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 3,
-                                ),
-                              ),
-                              child: const Text(
-                                'Adicionar por QR code',
-                                style: TextStyle(fontSize: 11),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ]),
+                    ],
                   ),
                 ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _DeviceCategory {
-  final String title;
-  final String description;
-  final IconData icon;
-
-  const _DeviceCategory({
-    required this.title,
-    required this.description,
-    required this.icon,
-  });
-}
-
-class _NearbySearchCard extends StatelessWidget {
-  final VoidCallback onTap;
-
-  const _NearbySearchCard({required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: const Color(0xFF163B37),
-      borderRadius: BorderRadius.circular(17),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(17),
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(17),
-            border: Border.all(color: cosMint.withValues(alpha: 0.3)),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: const BoxDecoration(
-                  color: cosMint,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.radar_rounded,
-                  color: cosBackground,
-                  size: 25,
-                ),
-              ),
-              const SizedBox(width: 14),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Procurar por perto',
-                      style: TextStyle(
-                        color: cosForeground,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    SizedBox(height: 5),
-                    Text(
-                      'Encontre dispositivos compatíveis na sua rede.',
-                      style: TextStyle(
-                        color: cosMuted,
-                        fontSize: 10,
-                        height: 1.4,
-                      ),
-                    ),
-                    SizedBox(height: 8),
-                    Text(
-                      'Busca automática ainda não configurada',
-                      style: TextStyle(
-                        color: cosMint,
-                        fontSize: 9,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              const Icon(Icons.chevron_right_rounded, color: cosMint),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _CategoryCard extends StatelessWidget {
-  final _DeviceCategory category;
-  final VoidCallback onTap;
-
-  const _CategoryCard({required this.category, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: cosPanel,
-      borderRadius: BorderRadius.circular(15),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(15),
-        child: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(15),
-            border: Border.all(color: cosBorder),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(category.icon, color: cosMint, size: 19),
-              const SizedBox(height: 7),
-              Text(
-                category.title,
-                style: const TextStyle(
-                  color: cosForeground,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 3),
-              Text(
-                category.description,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: cosMuted, fontSize: 9),
               ),
             ],
           ),

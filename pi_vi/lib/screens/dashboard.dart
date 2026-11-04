@@ -1,8 +1,20 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+
 import 'automacao.dart';
 import 'dispositivo.dart';
 import 'perfil.dart';
+import 'splash_screen.dart';
+
+import '../models/dispositivo_iot.dart';
+import '../services/dispositivo_iot_service.dart';
+import '../services/firebase_service.dart';
 import '../widgets/cos_app_navigation.dart';
+
+// =====================================================
+// CORES DO COS
+// =====================================================
 
 const Color _bg = Color(0xFF080B0F);
 const Color _panel = Color(0xFF10151B);
@@ -12,6 +24,10 @@ const Color _muted = Color(0xFF8A98A5);
 const Color _fg = Color(0xFFF1F5F8);
 const Color _mint = Color(0xFF4FE0C0);
 
+// =====================================================
+// DASHBOARD
+// =====================================================
+
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
 
@@ -20,266 +36,656 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  final List<_RoomData> _ambientes = [
-    _RoomData(
-      nome: 'Sala de estar',
-      dispositivos: ['Luz da sala', 'Ar-condicionado'],
-      icone: Icons.weekend_outlined,
-    ),
-    _RoomData(
-      nome: 'Quarto',
-      dispositivos: ['Luz do quarto'],
-      icone: Icons.bed_outlined,
-    ),
-    _RoomData(
-      nome: 'Cozinha',
-      dispositivos: ['Tomada inteligente'],
-      icone: Icons.kitchen_outlined,
-    ),
-    _RoomData(nome: 'Banheiro', dispositivos: [], icone: Icons.shower_outlined),
-  ];
+  List<DispositivoIot> _dispositivos = [];
 
-  final List<_DeviceData> _dispositivos = [
-    _DeviceData(
-      nome: 'Luz da sala',
-      local: 'Sala de estar',
-      icone: Icons.lightbulb_outline_rounded,
-      ligado: true,
-    ),
-    _DeviceData(
-      nome: 'Ar-condicionado',
-      local: 'Sala de estar',
-      icone: Icons.ac_unit_rounded,
-      ligado: false,
-      online: false,
-    ),
-    _DeviceData(
-      nome: 'Luz do quarto',
-      local: 'Quarto',
-      icone: Icons.lightbulb_outline_rounded,
-      ligado: false,
-    ),
-    _DeviceData(
-      nome: 'Tomada inteligente',
-      local: 'Cozinha',
-      icone: Icons.power_rounded,
-      ligado: true,
-    ),
-    _DeviceData(
-      nome: 'Lâmpada',
-      local: 'Sem ambiente',
-      icone: Icons.lightbulb_outline_rounded,
-      ligado: false,
-    ),
-    _DeviceData(
-      nome: 'Tomada TV',
-      local: 'Sem ambiente',
-      icone: Icons.power_rounded,
-      ligado: false,
-    ),
-  ];
+  StreamSubscription<List<DispositivoIot>>? _assinatura;
 
-  final List<_AtalhoData> _atalhosSalvos = [];
+  bool _carregando = true;
+  bool _saindo = false;
+  String? _erro;
+
   final AutomacaoData _automacaoData = AutomacaoData();
+
+  final List<_Ambiente> _ambientes = [
+    _Ambiente(nome: 'Sala de estar', icone: Icons.weekend_outlined),
+    _Ambiente(nome: 'Quarto', icone: Icons.bed_outlined),
+    _Ambiente(nome: 'Cozinha', icone: Icons.kitchen_outlined),
+    _Ambiente(nome: 'Banheiro', icone: Icons.shower_outlined),
+  ];
+
+  final List<_Atalho> _atalhos = [];
+
+  // =====================================================
+  // INICIALIZAÇÃO
+  // =====================================================
 
   @override
   void initState() {
     super.initState();
-    _atalhosSalvos.addAll([
-      _AtalhoData(
-        nome: 'Modo noite',
-        configuracoes: {
-          _ambientes[0]: {_dispositivos[0]: false, _dispositivos[1]: false},
-          _ambientes[1]: {_dispositivos[2]: false},
-        },
-      ),
-      _AtalhoData(
-        nome: 'Modo dia',
-        configuracoes: {
-          _ambientes[0]: {_dispositivos[0]: true, _dispositivos[1]: false},
-          _ambientes[2]: {_dispositivos[3]: true},
-        },
-      ),
-    ]);
+    _iniciarDispositivos();
   }
 
-  int get _dispositivosLigados =>
-      _dispositivos.where((dispositivo) => dispositivo.ligado).length;
+  void _iniciarDispositivos() {
+    _assinatura?.cancel();
 
-  void _atualizarLocaisDispositivos() {
-    for (final dispositivo in _dispositivos) {
-      dispositivo.local = 'Sem ambiente';
-      for (final ambiente in _ambientes) {
-        if (ambiente.dispositivos.contains(dispositivo.nome)) {
-          dispositivo.local = ambiente.nome;
-          break;
-        }
+    if (FirebaseService.usuarioAtual == null) {
+      if (mounted) {
+        setState(() {
+          _carregando = false;
+          _erro = 'Faça login para visualizar seus dispositivos.';
+        });
+      }
+      return;
+    }
+
+    try {
+      _assinatura = DispositivoIotService.observarDispositivos().listen(
+        (lista) {
+          if (!mounted || _saindo) return;
+
+          setState(() {
+            _dispositivos = lista;
+            _carregando = false;
+            _erro = null;
+          });
+        },
+        onError: (Object erro) {
+          if (!mounted || _saindo) return;
+
+          setState(() {
+            _carregando = false;
+            _erro = erro.toString();
+          });
+        },
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _carregando = false;
+        _erro = e.toString();
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _assinatura?.cancel();
+    super.dispose();
+  }
+
+  // =====================================================
+  // DISPOSITIVOS
+  // =====================================================
+
+  int get _totalDispositivos => _dispositivos.length;
+
+  int get _dispositivosLigados => _dispositivos.where((d) => d.ligado).length;
+
+  String _ambienteDe(DispositivoIot d) {
+    final ambiente = d.ambienteId?.trim();
+
+    if (ambiente == null || ambiente.isEmpty) {
+      return 'Sem ambiente';
+    }
+
+    return ambiente;
+  }
+
+  bool _online(DispositivoIot d) {
+    return d.statusConexao == 'conectado';
+  }
+
+  IconData _iconeDe(DispositivoIot d) {
+    final tipo = d.tipo.toLowerCase();
+
+    if (tipo.contains('luz') ||
+        tipo.contains('lampada') ||
+        tipo.contains('lâmpada')) {
+      return Icons.lightbulb_outline_rounded;
+    }
+
+    if (tipo.contains('tomada')) {
+      return Icons.power_rounded;
+    }
+
+    if (tipo.contains('ar-condicionado') || tipo.contains('clima')) {
+      return Icons.ac_unit_rounded;
+    }
+
+    if (tipo.contains('tv') || tipo.contains('televisão')) {
+      return Icons.tv_rounded;
+    }
+
+    if (tipo.contains('ventilador')) {
+      return Icons.air_rounded;
+    }
+
+    return Icons.devices_other_rounded;
+  }
+
+  String _tipoPeloIcone(IconData icone) {
+    if (icone == Icons.lightbulb_outline_rounded) {
+      return 'Lâmpada';
+    }
+
+    if (icone == Icons.power_rounded ||
+        icone == Icons.electrical_services_outlined) {
+      return 'Tomada';
+    }
+
+    if (icone == Icons.ac_unit_rounded) {
+      return 'Ar-condicionado';
+    }
+
+    if (icone == Icons.tv_rounded) {
+      return 'TV';
+    }
+
+    if (icone == Icons.air_rounded) {
+      return 'Ventilador';
+    }
+
+    return 'Outro';
+  }
+
+  List<DispositivoIot> _dispositivosDoAmbiente(String ambiente) {
+    return _dispositivos.where((d) => _ambienteDe(d) == ambiente).toList();
+  }
+
+  Future<void> _adicionarDispositivo(DispositivoListaItem item) async {
+    final identificador = 'app-${DateTime.now().microsecondsSinceEpoch}';
+
+    await DispositivoIotService.cadastrar(
+      nome: item.nome,
+      identificador: identificador,
+      tipo: _tipoPeloIcone(item.icone),
+      ambienteId: item.ambiente == 'Sem ambiente' ? null : item.ambiente,
+    );
+  }
+
+  Future<void> _alterarEstado(DispositivoIot dispositivo, bool ligado) async {
+    try {
+      await DispositivoIotService.alterarEstado(
+        id: dispositivo.id,
+        ligado: ligado,
+      );
+    } catch (e) {
+      _mostrarMensagem('Erro ao atualizar dispositivo: $e');
+    }
+  }
+
+  Future<void> _alternarPorId(String id) async {
+    for (final d in _dispositivos) {
+      if (d.id == id) {
+        await _alterarEstado(d, !d.ligado);
+        return;
       }
     }
   }
 
-  String _resumoAmbiente(_RoomData ambiente) {
-    final quantidade = ambiente.dispositivos.length;
-    if (quantidade == 0) return 'Nenhum dispositivo';
-    return '$quantidade ${quantidade == 1 ? 'dispositivo' : 'dispositivos'}';
+  // =====================================================
+  // LOGOUT CENTRALIZADO
+  // UTILIZADO PELA DASHBOARD E PELO PERFIL
+  // =====================================================
+
+  Future<void> _confirmarLogout() async {
+    if (!mounted || _saindo) return;
+
+    final confirmar = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          backgroundColor: _panel,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+          ),
+          title: const Row(
+            children: [
+              Icon(Icons.logout_rounded, color: Colors.redAccent),
+              SizedBox(width: 10),
+              Flexible(
+                child: Text(
+                  'Sair da conta?',
+                  style: TextStyle(
+                    color: _fg,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: const Text(
+            'Deseja realmente sair da sua conta COS?\n\n'
+            'Seus dispositivos continuarão salvos '
+            'no Cloud Firestore.',
+            style: TextStyle(color: _muted, fontSize: 13),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(dialogContext, false);
+              },
+              child: const Text('Cancelar'),
+            ),
+            TextButton.icon(
+              onPressed: () {
+                Navigator.pop(dialogContext, true);
+              },
+              icon: const Icon(
+                Icons.logout_rounded,
+                color: Colors.redAccent,
+                size: 18,
+              ),
+              label: const Text(
+                'Sair',
+                style: TextStyle(color: Colors.redAccent),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmar != true || !mounted) {
+      return;
+    }
+
+    setState(() {
+      _saindo = true;
+    });
+
+    try {
+      // 1. Interrompe atualizações do Firestore.
+      await _assinatura?.cancel();
+      _assinatura = null;
+
+      // 2. Encerra a autenticação.
+      await FirebaseService.logout();
+
+      if (!mounted) return;
+
+      // 3. Limpa as telas anteriores.
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const SplashScreen()),
+        (route) => false,
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      _mostrarMensagem('Erro ao sair da conta: $e');
+
+      if (FirebaseService.usuarioAtual != null) {
+        _iniciarDispositivos();
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _saindo = false;
+        });
+      }
+    }
   }
 
+  // =====================================================
+  // NAVEGAÇÃO
+  // =====================================================
+
   Future<void> _selecionarAba(int index) async {
-    Navigator.of(context).popUntil((route) => route.isFirst);
+    if (!mounted || _saindo) return;
+
     switch (index) {
       case 0:
         return;
+
       case 1:
         await Navigator.of(context).push(
           MaterialPageRoute(
             builder: (_) => DispositivoScreen(
-              dispositivos: _dispositivos
-                  .map(
-                    (device) => DispositivoListaItem(
-                      nome: device.nome,
-                      ambiente: device.local,
-                      icone: device.icone,
-                      ligado: device.ligado,
-                      online: device.online,
-                    ),
-                  )
-                  .toList(),
-              ambientes: _ambientes.map((room) => room.nome).toList(),
-              onToggle: (name) {
-                final device = _dispositivos.firstWhere(
-                  (item) => item.nome == name,
+              dispositivos: _dispositivos.map((d) {
+                return DispositivoListaItem(
+                  id: d.id,
+                  nome: d.nome,
+                  ambiente: _ambienteDe(d),
+                  icone: _iconeDe(d),
+                  ligado: d.ligado,
+                  online: _online(d),
                 );
-                setState(() => device.ligado = !device.ligado);
-              },
-              onAddDevice: (item) {
-                setState(() {
-                  _dispositivos.add(
-                    _DeviceData(
-                      nome: item.nome,
-                      local: item.ambiente,
-                      icone: item.icone,
-                      ligado: item.ligado,
-                      online: item.online,
-                    ),
-                  );
-                  if (item.ambiente != 'Sem ambiente') {
-                    final room = _ambientes.firstWhere(
-                      (room) => room.nome == item.ambiente,
-                    );
-                    room.dispositivos.add(item.nome);
-                  }
-                });
-              },
-              onNavigate: (selectedIndex) {
-                if (selectedIndex != 1) {
-                  _selecionarAba(selectedIndex);
-                }
+              }).toList(),
+              ambientes: _ambientes.map((a) => a.nome).toList(),
+              onToggle: _alternarPorId,
+              onAddDevice: _adicionarDispositivo,
+              onNavigate: (aba) {
+                _navegarDaSubtela(aba, 1);
               },
             ),
           ),
         );
+        return;
+
       case 2:
+        final dispositivosAutomacao = _dispositivos
+            .where((d) {
+              final tipo = d.tipo.toLowerCase();
+
+              return tipo.contains('luz') ||
+                  tipo.contains('lâmpada') ||
+                  tipo.contains('lampada') ||
+                  tipo.contains('tomada');
+            })
+            .map((d) {
+              final tipo = d.tipo.toLowerCase();
+
+              return AutomacaoDevice(
+                id: d.id,
+                name: d.nome,
+                location: _ambienteDe(d),
+                type: tipo.contains('tomada')
+                    ? AutomacaoDeviceType.tomada
+                    : AutomacaoDeviceType.lampada,
+                online: _online(d),
+                isOn: d.ligado,
+              );
+            })
+            .toList();
+
         await Navigator.of(context).push(
           MaterialPageRoute(
             builder: (_) => AutomacaoScreen(
               data: _automacaoData,
-              devices: _dispositivos
-                  .where(
-                    (device) =>
-                        device.icone == Icons.lightbulb_outline_rounded ||
-                        device.icone == Icons.power_rounded ||
-                        device.icone == Icons.electrical_services_outlined,
-                  )
-                  .map(
-                    (device) => AutomacaoDevice(
-                      id: device.id,
-                      name: device.nome,
-                      location: device.local,
-                      type: device.icone == Icons.lightbulb_outline_rounded
-                          ? AutomacaoDeviceType.lampada
-                          : AutomacaoDeviceType.tomada,
-                      online: device.online,
-                      isOn: device.ligado,
-                    ),
-                  )
-                  .toList(),
-              onPowerChanged: (deviceId, enabled) {
-                final device = _dispositivos.firstWhere(
-                  (item) => item.id == deviceId,
-                );
-                setState(() => device.ligado = enabled);
-              },
-              onNavigate: (selectedIndex) {
-                if (selectedIndex != 2) {
-                  _selecionarAba(selectedIndex);
+              devices: dispositivosAutomacao,
+              onPowerChanged: (id, ligado) {
+                for (final d in _dispositivos) {
+                  if (d.id == id) {
+                    _alterarEstado(d, ligado);
+                    return;
+                  }
                 }
+              },
+              onNavigate: (aba) {
+                _navegarDaSubtela(aba, 2);
               },
             ),
           ),
         );
+        return;
+
       case 3:
         _mostrarMensagem('Você não tem alertas novos.');
+        return;
+
       case 4:
         await Navigator.of(context).push(
           MaterialPageRoute(
             builder: (_) => PerfilScreen(
-              ambientesCasa: _ambientes.map((ambiente) {
-                final quantidade = ambiente.dispositivos.length;
-                if (quantidade == 0) {
-                  return '${ambiente.nome} — sem dispositivos';
-                }
-                final rotulo = quantidade == 1 ? 'dispositivo' : 'dispositivos';
-                return '${ambiente.nome} — $quantidade $rotulo: '
-                    '${ambiente.dispositivos.join(', ')}';
+              ambientesCasa: _ambientes.map((a) {
+                final quantidade = _dispositivosDoAmbiente(a.nome).length;
+
+                return '${a.nome} — $quantidade dispositivos';
               }).toList(),
-              dispositivosCasa: _dispositivos
-                  .map(
-                    (dispositivo) =>
-                        '${dispositivo.nome} — ${dispositivo.local}; '
-                        '${dispositivo.ligado ? 'Ligado' : 'Desligado'}',
-                  )
-                  .toList(),
-              onNavigate: (selectedIndex) {
-                if (selectedIndex != 4) {
-                  _selecionarAba(selectedIndex);
-                }
+
+              dispositivosCasa: _dispositivos.map((d) {
+                return '${d.nome} — '
+                    '${_ambienteDe(d)} — '
+                    '${d.ligado ? 'Ligado' : 'Desligado'}';
+              }).toList(),
+
+              onNavigate: (aba) {
+                _navegarDaSubtela(aba, 4);
               },
+
+              // COMPATÍVEL COM O PERFIL.DART NOVO
+              onLogout: _confirmarLogout,
             ),
           ),
         );
+        return;
+    }
+  }
+
+  void _navegarDaSubtela(int novaAba, int abaAtual) {
+    if (!mounted || _saindo || novaAba == abaAtual) {
+      return;
+    }
+
+    final navigator = Navigator.of(context);
+
+    navigator.popUntil((route) => route.isFirst);
+
+    if (novaAba != 0) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && !_saindo) {
+          _selecionarAba(novaAba);
+        }
+      });
+    }
+  }
+
+  // =====================================================
+  // DIÁLOGOS
+  // =====================================================
+
+  Future<String?> _pedirNome({
+    required String titulo,
+    String inicial = '',
+  }) async {
+    final controller = TextEditingController(text: inicial);
+
+    final resultado = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          backgroundColor: _panel,
+          title: Text(titulo, style: const TextStyle(color: _fg)),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            maxLength: 80,
+            style: const TextStyle(color: _fg),
+            decoration: const InputDecoration(labelText: 'Nome'),
+            onSubmitted: (valor) {
+              Navigator.pop(dialogContext, valor.trim());
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(dialogContext);
+              },
+              child: const Text('Cancelar'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(dialogContext, controller.text.trim());
+              },
+              child: const Text('Salvar'),
+            ),
+          ],
+        );
+      },
+    );
+
+    controller.dispose();
+
+    return resultado;
+  }
+
+  Future<bool> _confirmar({
+    required String titulo,
+    required String descricao,
+  }) async {
+    final resultado = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          backgroundColor: _panel,
+          title: Text(titulo, style: const TextStyle(color: _fg)),
+          content: Text(descricao, style: const TextStyle(color: _muted)),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(dialogContext, false);
+              },
+              child: const Text('Cancelar'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(dialogContext, true);
+              },
+              child: const Text(
+                'Confirmar',
+                style: TextStyle(color: Colors.redAccent),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    return resultado ?? false;
+  }
+
+  // =====================================================
+  // AMBIENTES
+  // =====================================================
+
+  int _quantidadeNoAmbiente(String nome) {
+    return _dispositivosDoAmbiente(nome).length;
+  }
+
+  Future<void> _novoAmbiente() async {
+    final nome = await _pedirNome(titulo: 'Novo ambiente');
+
+    if (nome == null || nome.isEmpty || !mounted) {
+      return;
+    }
+
+    final existe = _ambientes.any(
+      (a) => a.nome.toLowerCase() == nome.toLowerCase(),
+    );
+
+    if (existe) {
+      _mostrarMensagem('Já existe um ambiente com esse nome.');
+      return;
+    }
+
+    setState(() {
+      _ambientes.add(_Ambiente(nome: nome, icone: Icons.meeting_room_outlined));
+    });
+
+    _mostrarMensagem('Ambiente criado!');
+  }
+
+  Future<void> _editarAmbiente(_Ambiente ambiente) async {
+    final novoNome = await _pedirNome(
+      titulo: 'Editar ambiente',
+      inicial: ambiente.nome,
+    );
+
+    if (novoNome == null ||
+        novoNome.isEmpty ||
+        novoNome == ambiente.nome ||
+        !mounted) {
+      return;
+    }
+
+    final existe = _ambientes.any(
+      (a) =>
+          !identical(a, ambiente) &&
+          a.nome.toLowerCase() == novoNome.toLowerCase(),
+    );
+
+    if (existe) {
+      _mostrarMensagem('Já existe um ambiente com esse nome.');
+      return;
+    }
+
+    try {
+      final dispositivos = _dispositivosDoAmbiente(ambiente.nome);
+
+      for (final d in dispositivos) {
+        await DispositivoIotService.atualizarCadastro(
+          id: d.id,
+          nome: d.nome,
+          identificador: d.identificador,
+          tipo: d.tipo,
+          ambienteId: novoNome,
+        );
+      }
+
+      if (!mounted) return;
+
+      setState(() {
+        ambiente.nome = novoNome;
+      });
+
+      _mostrarMensagem('Ambiente atualizado!');
+    } catch (e) {
+      _mostrarMensagem('Erro ao atualizar ambiente: $e');
+    }
+  }
+
+  Future<void> _excluirAmbiente(_Ambiente ambiente) async {
+    final confirmado = await _confirmar(
+      titulo: 'Excluir ambiente?',
+      descricao:
+          'Deseja excluir "${ambiente.nome}"?\n\n'
+          'Os dispositivos continuarão cadastrados, '
+          'mas ficarão sem ambiente.',
+    );
+
+    if (!confirmado || !mounted) return;
+
+    try {
+      final dispositivos = _dispositivosDoAmbiente(ambiente.nome);
+
+      for (final d in dispositivos) {
+        await DispositivoIotService.atualizarCadastro(
+          id: d.id,
+          nome: d.nome,
+          identificador: d.identificador,
+          tipo: d.tipo,
+          ambienteId: null,
+        );
+      }
+
+      if (!mounted) return;
+
+      setState(() {
+        _ambientes.remove(ambiente);
+      });
+
+      _mostrarMensagem('Ambiente excluído!');
+    } catch (e) {
+      _mostrarMensagem('Erro ao excluir ambiente: $e');
     }
   }
 
   Future<void> _gerenciarAmbientes() async {
     await showDialog<void>(
       context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
+      builder: (dialogContext) {
+        return AlertDialog(
           backgroundColor: _panel,
           title: const Text(
             'Gerenciar ambientes',
-            style: TextStyle(color: _fg, fontWeight: FontWeight.w700),
+            style: TextStyle(color: _fg),
           ),
           content: SizedBox(
             width: 420,
             child: ConstrainedBox(
               constraints: BoxConstraints(
-                maxHeight: MediaQuery.sizeOf(context).height * 0.5,
+                maxHeight: MediaQuery.sizeOf(context).height * 0.55,
               ),
               child: _ambientes.isEmpty
-                  ? const Center(
-                      child: Text(
-                        'Nenhum ambiente cadastrado.',
-                        style: TextStyle(color: _muted),
-                      ),
+                  ? const Text(
+                      'Nenhum ambiente cadastrado.',
+                      style: TextStyle(color: _muted),
                     )
-                  : ListView.separated(
+                  : ListView(
                       shrinkWrap: true,
-                      itemCount: _ambientes.length,
-                      separatorBuilder: (_, _) =>
-                          const Divider(color: _border, height: 1),
-                      itemBuilder: (context, index) {
-                        final ambiente = _ambientes[index];
+                      children: _ambientes.map((ambiente) {
                         return ListTile(
                           contentPadding: EdgeInsets.zero,
                           title: Text(
@@ -287,42 +693,39 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             style: const TextStyle(color: _fg),
                           ),
                           subtitle: Text(
-                            _resumoAmbiente(ambiente),
+                            '${_quantidadeNoAmbiente(ambiente.nome)} '
+                            'dispositivos',
                             style: const TextStyle(color: _muted),
                           ),
-                          onTap: () async {
-                            await _editarAmbiente(ambiente);
-                            setDialogState(() {});
-                          },
                           trailing: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               IconButton(
-                                tooltip: 'Editar ambiente',
-                                onPressed: () async {
-                                  await _editarAmbiente(ambiente);
-                                  setDialogState(() {});
-                                },
+                                tooltip: 'Editar',
                                 icon: const Icon(
                                   Icons.edit_outlined,
                                   color: _mint,
                                 ),
+                                onPressed: () {
+                                  Navigator.pop(dialogContext);
+                                  _editarAmbiente(ambiente);
+                                },
                               ),
                               IconButton(
-                                tooltip: 'Excluir ambiente',
-                                onPressed: () async {
-                                  await _confirmarExcluirAmbiente(ambiente);
-                                  setDialogState(() {});
-                                },
+                                tooltip: 'Excluir',
                                 icon: const Icon(
                                   Icons.delete_outline,
                                   color: Colors.redAccent,
                                 ),
+                                onPressed: () {
+                                  Navigator.pop(dialogContext);
+                                  _excluirAmbiente(ambiente);
+                                },
                               ),
                             ],
                           ),
                         );
-                      },
+                      }).toList(),
                     ),
             ),
           ),
@@ -336,737 +739,384 @@ class _DashboardScreenState extends State<DashboardScreen> {
               label: const Text('Adicionar ambiente'),
             ),
             TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
+              onPressed: () {
+                Navigator.pop(dialogContext);
+              },
               child: const Text('Fechar'),
             ),
           ],
-        ),
-      ),
+        );
+      },
     );
   }
 
-  Future<void> _novoAmbiente() async {
-    final formKey = GlobalKey<FormState>();
-    var nome = '';
-    final nomeConfirmado = await showDialog<String>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        backgroundColor: _panel,
-        title: const Text(
-          'Novo ambiente',
-          style: TextStyle(color: _fg, fontWeight: FontWeight.w700),
-        ),
-        content: Form(
-          key: formKey,
-          child: TextFormField(
-            autofocus: true,
-            style: const TextStyle(color: _fg),
-            decoration: const InputDecoration(labelText: 'Nome do ambiente'),
-            onChanged: (value) => nome = value,
-            validator: (value) {
-              final nome = value?.trim() ?? '';
-              if (nome.isEmpty) return 'Digite um nome.';
-              if (_ambientes.any(
-                (ambiente) => ambiente.nome.toLowerCase() == nome.toLowerCase(),
-              )) {
-                return 'Já existe um ambiente com esse nome.';
-              }
-              return null;
-            },
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancelar'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              if (formKey.currentState!.validate()) {
-                Navigator.pop(dialogContext, nome.trim());
-              }
-            },
-            child: const Text('Criar'),
-          ),
-        ],
-      ),
-    );
-    if (nomeConfirmado == null) return;
+  // =====================================================
+  // ATALHOS
+  // =====================================================
 
-    final ambiente = _RoomData(
-      nome: nomeConfirmado,
-      dispositivos: [],
-      icone: Icons.meeting_room_outlined,
-    );
-    setState(() => _ambientes.add(ambiente));
-    await _editarAmbiente(ambiente);
-  }
+  Future<Map<String, bool>?> _configurarAtalho(
+    String titulo,
+    Map<String, bool> inicial,
+  ) async {
+    final configuracoes = Map<String, bool>.from(inicial);
 
-  Future<void> _editarAmbiente(_RoomData ambiente) async {
-    var nomeAmbiente = ambiente.nome;
-    final formKey = GlobalKey<FormState>();
-    await showDialog<void>(
+    return showDialog<Map<String, bool>>(
       context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          backgroundColor: _panel,
-          title: const Text(
-            'Editar ambiente',
-            style: TextStyle(color: _fg, fontWeight: FontWeight.w700),
-          ),
-          content: SizedBox(
-            width: 420,
-            child: Form(
-              key: formKey,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  TextFormField(
-                    initialValue: ambiente.nome,
-                    style: const TextStyle(color: _fg),
-                    decoration: const InputDecoration(
-                      labelText: 'Nome do ambiente',
-                    ),
-                    onChanged: (value) => nomeAmbiente = value,
-                    validator: (value) {
-                      final nome = value?.trim() ?? '';
-                      if (nome.isEmpty) return 'Digite um nome.';
-                      if (_ambientes.any(
-                        (item) =>
-                            !identical(item, ambiente) &&
-                            item.nome.toLowerCase() == nome.toLowerCase(),
-                      )) {
-                        return 'Já existe um ambiente com esse nome.';
-                      }
-                      return null;
-                    },
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, atualizar) {
+            return AlertDialog(
+              backgroundColor: _panel,
+              title: Text(titulo, style: const TextStyle(color: _fg)),
+              content: SizedBox(
+                width: 420,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxHeight: MediaQuery.sizeOf(context).height * 0.55,
                   ),
-                  const SizedBox(height: 20),
-                  Row(
-                    children: [
-                      const Expanded(
-                        child: Text(
-                          'Dispositivos conectados',
-                          style: TextStyle(
-                            color: _fg,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                      TextButton.icon(
-                        onPressed: () async {
-                          final selecionados =
-                              await _adicionarDispositivosAoAmbiente(ambiente);
-                          if (selecionados.isNotEmpty) {
-                            setDialogState(() {});
-                          }
-                        },
-                        icon: const Icon(Icons.add, size: 18),
-                        label: const Text('Adicionar'),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  if (ambiente.dispositivos.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 12),
-                      child: Text(
-                        'Nenhum dispositivo conectado.',
-                        style: TextStyle(color: _muted),
-                      ),
-                    )
-                  else
-                    ConstrainedBox(
-                      constraints: const BoxConstraints(maxHeight: 220),
-                      child: ListView.separated(
-                        shrinkWrap: true,
-                        itemCount: ambiente.dispositivos.length,
-                        separatorBuilder: (_, _) =>
-                            const Divider(color: _border, height: 1),
-                        itemBuilder: (context, index) {
-                          final nomeDispositivo = ambiente.dispositivos[index];
-                          final dispositivo = _dispositivos.firstWhere(
-                            (item) => item.nome == nomeDispositivo,
-                          );
-                          return ListTile(
-                            contentPadding: EdgeInsets.zero,
-                            leading: Icon(dispositivo.icone, color: _mint),
+                  child: ListView(
+                    shrinkWrap: true,
+                    children: _dispositivos.map((d) {
+                      final selecionado = configuracoes.containsKey(d.id);
+
+                      return Column(
+                        children: [
+                          CheckboxListTile(
+                            value: selecionado,
+                            activeColor: _mint,
                             title: Text(
-                              dispositivo.nome,
+                              d.nome,
                               style: const TextStyle(color: _fg),
                             ),
-                            trailing: IconButton(
-                              tooltip: 'Remover dispositivo',
-                              onPressed: () async {
-                                final confirmou = await showDialog<bool>(
-                                  context: context,
-                                  builder: (confirmContext) => AlertDialog(
-                                    backgroundColor: _panel,
-                                    title: const Text(
-                                      'Remover dispositivo?',
-                                      style: TextStyle(color: _fg),
-                                    ),
-                                    content: Text(
-                                      'Você deseja excluir "$nomeDispositivo" deste ambiente?',
-                                      style: const TextStyle(color: _muted),
-                                    ),
-                                    actions: [
-                                      TextButton(
-                                        onPressed: () => Navigator.pop(
-                                          confirmContext,
-                                          false,
-                                        ),
-                                        child: const Text('Cancelar'),
-                                      ),
-                                      TextButton(
-                                        onPressed: () =>
-                                            Navigator.pop(confirmContext, true),
-                                        child: const Text(
-                                          'Remover',
-                                          style: TextStyle(
-                                            color: Colors.redAccent,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                                if (confirmou == true) {
-                                  setState(() {
-                                    ambiente.dispositivos.remove(
-                                      nomeDispositivo,
-                                    );
-                                    for (final atalho in _atalhosSalvos) {
-                                      atalho.configuracoes[ambiente]?.remove(
-                                        dispositivo,
-                                      );
-                                    }
-                                    _atualizarLocaisDispositivos();
-                                  });
-                                  setDialogState(() {});
-                                }
-                              },
-                              icon: const Icon(
-                                Icons.remove_circle_outline,
-                                color: Colors.redAccent,
-                              ),
+                            subtitle: Text(
+                              _ambienteDe(d),
+                              style: const TextStyle(color: _muted),
                             ),
-                          );
-                        },
-                      ),
-                    ),
-                ],
+                            onChanged: (valor) {
+                              atualizar(() {
+                                if (valor == true) {
+                                  configuracoes[d.id] = d.ligado;
+                                } else {
+                                  configuracoes.remove(d.id);
+                                }
+                              });
+                            },
+                          ),
+                          if (selecionado)
+                            SwitchListTile(
+                              value: configuracoes[d.id]!,
+                              title: const Text(
+                                'Ligar ao executar',
+                                style: TextStyle(color: _muted, fontSize: 12),
+                              ),
+                              activeThumbColor: _mint,
+                              onChanged: (valor) {
+                                atualizar(() {
+                                  configuracoes[d.id] = valor;
+                                });
+                              },
+                            ),
+                        ],
+                      );
+                    }).toList(),
+                  ),
+                ),
               ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Cancelar'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                if (!formKey.currentState!.validate()) return;
-                setState(() {
-                  ambiente.nome = nomeAmbiente.trim();
-                  _atualizarLocaisDispositivos();
-                });
-                Navigator.pop(dialogContext);
-              },
-              child: const Text('Salvar'),
-            ),
-          ],
-        ),
-      ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(dialogContext);
+                  },
+                  child: const Text('Cancelar'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(
+                      dialogContext,
+                      Map<String, bool>.from(configuracoes),
+                    );
+                  },
+                  child: const Text('Salvar'),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 
-  Future<List<String>> _adicionarDispositivosAoAmbiente(
-    _RoomData ambiente,
-  ) async {
-    final disponiveis = _dispositivos
-        .where((dispositivo) => dispositivo.local == 'Sem ambiente')
-        .toList();
-    if (disponiveis.isEmpty) {
-      _mostrarMensagem('Não há dispositivos disponíveis para conectar.');
-      return [];
+  Future<void> _novoAtalho() async {
+    if (_dispositivos.isEmpty) {
+      _mostrarMensagem('Cadastre um dispositivo antes de criar um modo.');
+      return;
     }
 
-    final selecionados = <String>{};
-    final resultado = await showDialog<List<String>>(
-      context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          backgroundColor: _panel,
-          title: const Text(
-            'Adicionar dispositivos',
-            style: TextStyle(color: _fg, fontWeight: FontWeight.w700),
-          ),
-          content: SizedBox(
-            width: 380,
-            child: ListView(
-              shrinkWrap: true,
-              children: disponiveis
-                  .map(
-                    (dispositivo) => CheckboxListTile(
-                      contentPadding: EdgeInsets.zero,
-                      value: selecionados.contains(dispositivo.nome),
-                      activeColor: _mint,
-                      title: Text(
-                        dispositivo.nome,
-                        style: const TextStyle(color: _fg),
-                      ),
-                      secondary: Icon(dispositivo.icone, color: _mint),
-                      onChanged: (marcado) {
-                        setDialogState(() {
-                          if (marcado == true) {
-                            selecionados.add(dispositivo.nome);
-                          } else {
-                            selecionados.remove(dispositivo.nome);
-                          }
-                        });
-                      },
-                    ),
-                  )
-                  .toList(),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Cancelar'),
-            ),
-            ElevatedButton(
-              onPressed: () =>
-                  Navigator.pop(dialogContext, selecionados.toList()),
-              child: const Text('Conectar'),
-            ),
-          ],
-        ),
-      ),
+    final nome = await _pedirNome(titulo: 'Criar modo');
+
+    if (nome == null || nome.isEmpty || !mounted) {
+      return;
+    }
+
+    final existe = _atalhos.any(
+      (a) => a.nome.toLowerCase() == nome.toLowerCase(),
     );
 
-    if (resultado == null || resultado.isEmpty) return [];
+    if (existe) {
+      _mostrarMensagem('Já existe um modo com esse nome.');
+      return;
+    }
+
+    final resultado = await _configurarAtalho(nome, {});
+
+    if (!mounted || resultado == null) return;
+
+    if (resultado.isEmpty) {
+      _mostrarMensagem('Selecione pelo menos um dispositivo.');
+      return;
+    }
+
     setState(() {
-      ambiente.dispositivos.addAll(resultado);
-      _atualizarLocaisDispositivos();
+      _atalhos.add(_Atalho(nome: nome, configuracoes: resultado));
     });
-    return resultado;
+
+    _mostrarMensagem('Modo criado!');
   }
 
-  Future<void> _confirmarExcluirAmbiente(_RoomData ambiente) async {
-    final dispositivos = ambiente.dispositivos;
-    final pergunta = dispositivos.isEmpty
-        ? 'Você deseja excluir o ambiente ${ambiente.nome}?'
-        : 'Você deseja excluir ${ambiente.nome} com os dispositivos ${dispositivos.join(' e ')}?';
-    final continuar = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        backgroundColor: _panel,
-        title: const Text('Excluir ambiente?', style: TextStyle(color: _fg)),
-        content: Text(pergunta, style: const TextStyle(color: _muted)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancelar'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Continuar'),
-          ),
-        ],
-      ),
+  Future<void> _editarAtalho(_Atalho atalho) async {
+    final resultado = await _configurarAtalho(
+      'Editar ${atalho.nome}',
+      atalho.configuracoes,
     );
-    if (continuar != true || !mounted) return;
 
-    final confirmarExclusao = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        backgroundColor: _panel,
-        title: const Text(
-          'Tem certeza que deseja excluir?',
-          style: TextStyle(color: _fg),
-        ),
-        content: const Text(
-          'Os dispositivos ficarão disponíveis para outro ambiente.',
-          style: TextStyle(color: _muted),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancelar'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text(
-              'Excluir ambiente',
-              style: TextStyle(color: Colors.redAccent),
-            ),
-          ),
-        ],
-      ),
-    );
-    if (confirmarExclusao != true || !mounted) return;
+    if (!mounted || resultado == null) return;
+
+    if (resultado.isEmpty) {
+      _mostrarMensagem('Selecione pelo menos um dispositivo.');
+      return;
+    }
 
     setState(() {
-      _ambientes.remove(ambiente);
-      for (final atalho in _atalhosSalvos) {
-        atalho.configuracoes.remove(ambiente);
+      atalho.configuracoes
+        ..clear()
+        ..addAll(resultado);
+    });
+
+    _mostrarMensagem('Modo atualizado!');
+  }
+
+  Future<void> _excluirAtalho(_Atalho atalho) async {
+    final confirmado = await _confirmar(
+      titulo: 'Excluir modo?',
+      descricao: 'Deseja excluir o modo "${atalho.nome}"?',
+    );
+
+    if (!confirmado || !mounted) return;
+
+    setState(() {
+      _atalhos.remove(atalho);
+    });
+  }
+
+  Future<void> _ativarAtalho(_Atalho atalho) async {
+    var atualizados = 0;
+
+    try {
+      for (final entrada in atalho.configuracoes.entries) {
+        final existe = _dispositivos.any((d) => d.id == entrada.key);
+
+        if (!existe) continue;
+
+        await DispositivoIotService.alterarEstado(
+          id: entrada.key,
+          ligado: entrada.value,
+        );
+
+        atualizados++;
       }
-      _atualizarLocaisDispositivos();
-    });
-    _mostrarMensagem('Ambiente "${ambiente.nome}" excluído.');
+
+      _mostrarMensagem(
+        'Modo "${atalho.nome}" ativado: '
+        '$atualizados dispositivos atualizados.',
+      );
+    } catch (e) {
+      _mostrarMensagem('Erro ao ativar modo: $e');
+    }
   }
 
-  void _mostrarMensagem(String mensagem) {
+  // =====================================================
+  // MENSAGENS
+  // =====================================================
+
+  void _mostrarMensagem(String texto) {
+    if (!mounted) return;
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(mensagem),
+        content: Text(texto),
         backgroundColor: _panel2,
         behavior: SnackBarBehavior.floating,
       ),
     );
   }
 
-  Future<void> _novoAtalho() => _editarAtalho();
-
-  Future<void> _editarAtalho([_AtalhoData? atalho]) async {
-    final formKey = GlobalKey<FormState>();
-    var nome = atalho?.nome ?? '';
-    var erroAmbiente = false;
-    final configuracoes = <_RoomData, Map<_DeviceData, bool>>{};
-    if (atalho != null) {
-      for (final entrada in atalho.configuracoes.entries) {
-        configuracoes[entrada.key] = Map<_DeviceData, bool>.from(entrada.value);
-      }
-    }
-
-    final resultado = await showDialog<_AtalhoData>(
-      context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          backgroundColor: _panel,
-          title: Text(
-            atalho == null ? 'Criar modo' : 'Editar modo',
-            style: const TextStyle(color: _fg, fontWeight: FontWeight.w700),
-          ),
-          content: SizedBox(
-            width: 440,
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                maxHeight: MediaQuery.sizeOf(context).height * 0.62,
-              ),
-              child: Form(
-                key: formKey,
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      TextFormField(
-                        initialValue: nome,
-                        autofocus: atalho == null,
-                        style: const TextStyle(color: _fg),
-                        decoration: const InputDecoration(
-                          labelText: 'Nome do modo',
-                          hintText: 'Ex.: Modo gamer',
-                        ),
-                        onChanged: (value) => nome = value,
-                        validator: (value) {
-                          final nomeInformado = value?.trim() ?? '';
-                          if (nomeInformado.isEmpty) return 'Digite um nome.';
-                          if (_atalhosSalvos.any(
-                            (item) =>
-                                !identical(item, atalho) &&
-                                item.nome.toLowerCase() ==
-                                    nomeInformado.toLowerCase(),
-                          )) {
-                            return 'Já existe um modo com esse nome.';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 20),
-                      const Text(
-                        'Ambientes e dispositivos',
-                        style: TextStyle(
-                          color: _fg,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      const Text(
-                        'Escolha os ambientes, os dispositivos e o estado desejado.',
-                        style: TextStyle(color: _muted, fontSize: 12),
-                      ),
-                      const SizedBox(height: 10),
-                      for (final ambiente in _ambientes) ...[
-                        CheckboxListTile(
-                          contentPadding: EdgeInsets.zero,
-                          dense: true,
-                          value: configuracoes.containsKey(ambiente),
-                          activeColor: _mint,
-                          title: Text(
-                            ambiente.nome,
-                            style: const TextStyle(
-                              color: _fg,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          subtitle: Text(
-                            _resumoAmbiente(ambiente),
-                            style: const TextStyle(color: _muted, fontSize: 11),
-                          ),
-                          onChanged: (selecionado) {
-                            setDialogState(() {
-                              erroAmbiente = false;
-                              if (selecionado == true) {
-                                configuracoes.putIfAbsent(
-                                  ambiente,
-                                  () => <_DeviceData, bool>{},
-                                );
-                              } else {
-                                configuracoes.remove(ambiente);
-                              }
-                            });
-                          },
-                        ),
-                        if (configuracoes.containsKey(ambiente))
-                          for (final nomeDispositivo in ambiente.dispositivos)
-                            Builder(
-                              builder: (context) {
-                                final dispositivo = _dispositivos.firstWhere(
-                                  (item) => item.nome == nomeDispositivo,
-                                );
-                                final dispositivosDoAmbiente =
-                                    configuracoes[ambiente]!;
-                                final selecionado = dispositivosDoAmbiente
-                                    .containsKey(dispositivo);
-                                return Padding(
-                                  padding: const EdgeInsets.only(left: 22),
-                                  child: Row(
-                                    children: [
-                                      Expanded(
-                                        child: CheckboxListTile(
-                                          contentPadding: EdgeInsets.zero,
-                                          dense: true,
-                                          value: selecionado,
-                                          activeColor: _mint,
-                                          title: Text(
-                                            dispositivo.nome,
-                                            style: const TextStyle(
-                                              color: _muted,
-                                              fontSize: 12,
-                                            ),
-                                          ),
-                                          onChanged: (marcado) {
-                                            setDialogState(() {
-                                              if (marcado == true) {
-                                                dispositivosDoAmbiente[dispositivo] =
-                                                    dispositivo.ligado;
-                                              } else {
-                                                dispositivosDoAmbiente.remove(
-                                                  dispositivo,
-                                                );
-                                              }
-                                            });
-                                          },
-                                        ),
-                                      ),
-                                      if (selecionado)
-                                        Switch.adaptive(
-                                          value:
-                                              dispositivosDoAmbiente[dispositivo]!,
-                                          activeThumbColor: _mint,
-                                          onChanged: (ligado) {
-                                            setDialogState(() {
-                                              dispositivosDoAmbiente[dispositivo] =
-                                                  ligado;
-                                            });
-                                          },
-                                        ),
-                                    ],
-                                  ),
-                                );
-                              },
-                            ),
-                      ],
-                      if (erroAmbiente)
-                        const Padding(
-                          padding: EdgeInsets.only(top: 8),
-                          child: Text(
-                            'Selecione pelo menos um ambiente.',
-                            style: TextStyle(
-                              color: Colors.redAccent,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Cancelar'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                if (!formKey.currentState!.validate()) return;
-                if (configuracoes.isEmpty) {
-                  setDialogState(() => erroAmbiente = true);
-                  return;
-                }
-                Navigator.pop(
-                  dialogContext,
-                  _AtalhoData(nome: nome.trim(), configuracoes: configuracoes),
-                );
-              },
-              child: Text(atalho == null ? 'Criar modo' : 'Salvar'),
-            ),
-          ],
-        ),
-      ),
-    );
-    if (resultado == null || !mounted) return;
-
-    setState(() {
-      if (atalho == null) {
-        _atalhosSalvos.add(resultado);
-      } else {
-        atalho.nome = resultado.nome;
-        atalho.configuracoes
-          ..clear()
-          ..addAll(resultado.configuracoes);
-      }
-    });
-  }
-
-  Future<void> _excluirAtalho(_AtalhoData atalho) async {
-    final confirmou = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        backgroundColor: _panel,
-        title: const Text('Excluir modo?', style: TextStyle(color: _fg)),
-        content: Text(
-          'O modo "${atalho.nome}" será removido.',
-          style: const TextStyle(color: _muted),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancelar'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text(
-              'Excluir',
-              style: TextStyle(color: Colors.redAccent),
-            ),
-          ),
-        ],
-      ),
-    );
-    if (confirmou != true || !mounted) return;
-    setState(() => _atalhosSalvos.remove(atalho));
-  }
-
-  void _ativarAtalho(_AtalhoData atalho) {
-    var dispositivosAtualizados = 0;
-    setState(() {
-      for (final dispositivos in atalho.configuracoes.values) {
-        for (final entrada in dispositivos.entries) {
-          entrada.key.ligado = entrada.value;
-          dispositivosAtualizados++;
-        }
-      }
-    });
-    _mostrarMensagem(
-      dispositivosAtualizados == 0
-          ? 'Modo "${atalho.nome}" ativado.'
-          : 'Modo "${atalho.nome}" ativado: $dispositivosAtualizados '
-                '${dispositivosAtualizados == 1 ? 'dispositivo atualizado' : 'dispositivos atualizados'}.',
-    );
-  }
+  // =====================================================
+  // INTERFACE PRINCIPAL
+  // =====================================================
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: _bg,
       body: SafeArea(
-        child: CustomScrollView(
-          slivers: [
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(20, 14, 20, 28),
-              sliver: SliverList(
-                delegate: SliverChildListDelegate([
-                  _cabecalho(),
-                  const SizedBox(height: 28),
-                  _saudacao(),
-                  const SizedBox(height: 22),
-                  _cartaoClima(),
-                  const SizedBox(height: 14),
-                  _resumoDispositivos(),
-                  const SizedBox(height: 28),
-                  _tituloSecao(
-                    'Dispositivos',
-                    '$_dispositivosLigados de ${_dispositivos.length} ligados',
-                    acao: 'Ver todos',
-                    onAcao: () => _selecionarAba(1),
-                  ),
-                  const SizedBox(height: 14),
-                  _gradeDispositivos(),
-                  const SizedBox(height: 28),
-                  _tituloSecao('Consumo de energia', 'Hoje'),
-                  const SizedBox(height: 14),
-                  _cartaoEnergia(),
-                  const SizedBox(height: 28),
-                  _tituloSecao(
-                    'Ambientes',
-                    '${_ambientes.length} ambientes',
-                    acao: 'Gerenciar',
-                    onAcao: _gerenciarAmbientes,
-                  ),
-                  const SizedBox(height: 14),
-                  _gradeAmbientes(),
-                  const SizedBox(height: 28),
-                  _tituloSecao(
-                    'Atalhos',
-                    'Suas rotinas',
-                    acao: '＋ Criar',
-                    onAcao: _novoAtalho,
-                  ),
-                  const SizedBox(height: 14),
-                  _atalhos(),
-                  const SizedBox(height: 24),
-                  const Center(
-                    child: Text(
-                      'COS  •  CONTROLE DA SUA CASA',
-                      style: TextStyle(
-                        color: _muted,
-                        fontSize: 10,
-                        letterSpacing: 1.5,
-                      ),
-                    ),
-                  ),
-                ]),
-              ),
-            ),
-          ],
-        ),
+        child: _carregando
+            ? const Center(child: CircularProgressIndicator(color: _mint))
+            : _erro != null
+            ? _estadoErro()
+            : _conteudoDashboard(),
       ),
       bottomNavigationBar: CosAppNavigation(
         selectedIndex: 0,
-        onSelected: (index) {
-          if (index != 0) _selecionarAba(index);
+        onSelected: (aba) {
+          if (aba != 0) {
+            _selecionarAba(aba);
+          }
         },
       ),
     );
   }
+
+  Widget _estadoErro() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.error_outline, color: Colors.redAccent, size: 45),
+            const SizedBox(height: 14),
+            Text(
+              'Erro ao carregar dispositivos:\n$_erro',
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: _fg),
+            ),
+            const SizedBox(height: 16),
+            TextButton(
+              onPressed: () {
+                setState(() {
+                  _carregando = true;
+                  _erro = null;
+                });
+
+                _iniciarDispositivos();
+              },
+              child: const Text('Tentar novamente'),
+            ),
+            const SizedBox(height: 10),
+            TextButton.icon(
+              onPressed: _confirmarLogout,
+              icon: const Icon(Icons.logout_rounded, color: Colors.redAccent),
+              label: const Text('Sair da conta'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _conteudoDashboard() {
+    return CustomScrollView(
+      slivers: [
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(20, 14, 20, 28),
+          sliver: SliverList(
+            delegate: SliverChildListDelegate([
+              _cabecalho(),
+
+              const SizedBox(height: 28),
+
+              _saudacao(),
+
+              const SizedBox(height: 22),
+
+              // TEMPERATURA DA CASA
+              _cartaoClima(),
+
+              const SizedBox(height: 14),
+
+              // DISPOSITIVOS E ENERGIA
+              _resumoDispositivos(),
+
+              const SizedBox(height: 28),
+
+              _tituloSecao(
+                'Dispositivos',
+                '$_dispositivosLigados de '
+                    '$_totalDispositivos ligados',
+                acao: 'Ver todos',
+                onAcao: () => _selecionarAba(1),
+              ),
+
+              const SizedBox(height: 14),
+
+              _gradeDispositivos(),
+
+              const SizedBox(height: 28),
+
+              _tituloSecao('Consumo de energia', 'Hoje'),
+
+              const SizedBox(height: 14),
+
+              _cartaoEnergia(),
+
+              const SizedBox(height: 28),
+
+              _tituloSecao(
+                'Ambientes',
+                '${_ambientes.length} ambientes',
+                acao: 'Gerenciar',
+                onAcao: _gerenciarAmbientes,
+              ),
+
+              const SizedBox(height: 14),
+
+              _gradeAmbientes(),
+
+              const SizedBox(height: 28),
+
+              _tituloSecao(
+                'Atalhos',
+                'Suas rotinas',
+                acao: '＋ Criar',
+                onAcao: _novoAtalho,
+              ),
+
+              const SizedBox(height: 14),
+
+              _gradeAtalhos(),
+
+              const SizedBox(height: 24),
+
+              const Center(
+                child: Text(
+                  'COS  •  CONTROLE DA SUA CASA',
+                  style: TextStyle(
+                    color: _muted,
+                    fontSize: 10,
+                    letterSpacing: 1.5,
+                  ),
+                ),
+              ),
+            ]),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // =====================================================
+  // CABEÇALHO ORIGINAL COM MENU COMPACTO
+  // =====================================================
 
   Widget _cabecalho() {
     return CosAppHeader(
@@ -1080,42 +1130,117 @@ class _DashboardScreenState extends State<DashboardScreen> {
             onPressed: () => _selecionarAba(3),
             icon: const Icon(Icons.notifications_none_rounded, color: _fg),
           ),
-          IconButton(
+
+          PopupMenuButton<String>(
             tooltip: 'Perfil',
-            onPressed: () => _selecionarAba(4),
+            position: PopupMenuPosition.under,
+            offset: const Offset(0, 4),
+
+            constraints: const BoxConstraints(minWidth: 190, maxWidth: 220),
+
+            color: _panel2,
+            elevation: 8,
+
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: const BorderSide(color: _border),
+            ),
+
             icon: const Icon(Icons.person_outline_rounded, color: _fg),
+
+            onSelected: (opcao) {
+              if (opcao == 'perfil') {
+                _selecionarAba(4);
+              } else if (opcao == 'logout') {
+                _confirmarLogout();
+              }
+            },
+
+            itemBuilder: (context) => const [
+              PopupMenuItem<String>(
+                value: 'perfil',
+                height: 44,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.settings_outlined, color: _mint, size: 18),
+                    SizedBox(width: 10),
+                    Text(
+                      'Configurações do perfil',
+                      style: TextStyle(color: _fg, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+
+              PopupMenuDivider(height: 1),
+
+              PopupMenuItem<String>(
+                value: 'logout',
+                height: 44,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.logout_rounded,
+                      color: Colors.redAccent,
+                      size: 18,
+                    ),
+                    SizedBox(width: 10),
+                    Text(
+                      'Sair da conta',
+                      style: TextStyle(color: Colors.redAccent, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
 
+  // =====================================================
+  // SAUDAÇÃO ORIGINAL
+  // =====================================================
+
   Widget _saudacao() {
-    return const Column(
+    final nome = FirebaseService.usuarioAtual?.displayName?.trim();
+
+    final primeiroNome = nome == null || nome.isEmpty
+        ? 'seja bem-vindo'
+        : nome.split(' ').first;
+
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
+        const Text(
           'Seu espaço, suas regras.',
           style: TextStyle(color: _muted, fontSize: 13),
         ),
-        SizedBox(height: 7),
+        const SizedBox(height: 7),
         Text(
-          'Olá, seja bem-vindo!',
-          style: TextStyle(
+          'Olá, $primeiroNome!',
+          style: const TextStyle(
             color: _fg,
             fontSize: 25,
             fontWeight: FontWeight.w800,
             letterSpacing: -0.5,
           ),
         ),
-        SizedBox(height: 7),
-        Text(
+        const SizedBox(height: 7),
+        const Text(
           'Veja o que está acontecendo na sua casa.',
           style: TextStyle(color: _muted, fontSize: 13),
         ),
       ],
     );
   }
+
+  // =====================================================
+  // CARTÃO ORIGINAL DE TEMPERATURA DA CASA
+  // =====================================================
 
   Widget _cartaoClima() {
     return Container(
@@ -1150,23 +1275,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                   ],
                 ),
+
                 SizedBox(height: 12),
+
                 Text(
-                  '22°C',
+                  '—',
                   style: TextStyle(
                     color: _fg,
                     fontSize: 34,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
+
                 SizedBox(height: 4),
+
                 Text(
-                  'Temperatura ilustrativa',
+                  'Nenhuma leitura de temperatura',
                   style: TextStyle(color: _muted, fontSize: 12),
                 ),
               ],
             ),
           ),
+
           Container(
             width: 72,
             height: 72,
@@ -1181,6 +1311,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  // =====================================================
+  // INDICADORES ORIGINAIS
+  // =====================================================
+
   Widget _resumoDispositivos() {
     return Row(
       children: [
@@ -1188,17 +1322,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
           child: _cartaoResumo(
             icone: Icons.power_settings_new_rounded,
             titulo: 'Dispositivos',
-            valor: '$_dispositivosLigados/${_dispositivos.length}',
+            valor: '$_dispositivosLigados/$_totalDispositivos',
             descricao: 'em funcionamento',
           ),
         ),
+
         const SizedBox(width: 12),
+
         Expanded(
           child: _cartaoResumo(
             icone: Icons.bolt_rounded,
             titulo: 'Energia hoje',
-            valor: '8,4 kWh',
-            descricao: 'valor ilustrativo',
+            valor: '—',
+            descricao: 'Sem dados de consumo',
           ),
         ),
       ],
@@ -1240,6 +1376,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  // =====================================================
+  // TÍTULOS
+  // =====================================================
+
   Widget _tituloSecao(
     String titulo,
     String subtitulo, {
@@ -1271,10 +1411,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         if (acao != null)
           TextButton(
             onPressed: onAcao,
-            style: TextButton.styleFrom(
-              foregroundColor: _mint,
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-            ),
+            style: TextButton.styleFrom(foregroundColor: _mint),
             child: Text(
               acao,
               style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
@@ -1284,7 +1421,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  // =====================================================
+  // GRADE DE DISPOSITIVOS
+  // =====================================================
+
   Widget _gradeDispositivos() {
+    if (_dispositivos.isEmpty) {
+      return _estadoVazioDispositivos();
+    }
+
     return GridView.builder(
       itemCount: _dispositivos.length,
       shrinkWrap: true,
@@ -1296,105 +1441,108 @@ class _DashboardScreenState extends State<DashboardScreen> {
         mainAxisExtent: 158,
       ),
       itemBuilder: (context, index) {
-        final dispositivo = _dispositivos[index];
+        final d = _dispositivos[index];
 
-        return _DeviceCard(
-          data: dispositivo,
+        return _DispositivoCard(
+          nome: d.nome,
+          ambiente: _ambienteDe(d),
+          icone: _iconeDe(d),
+          ligado: d.ligado,
           onChanged: (valor) {
-            setState(() => dispositivo.ligado = valor);
+            _alterarEstado(d, valor);
           },
         );
       },
     );
   }
 
-  Widget _cartaoEnergia() {
-    const dias = ['SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB', 'DOM'];
-    const valores = [0.42, 0.68, 0.51, 0.83, 0.61, 0.95, 0.72];
-
+  Widget _estadoVazioDispositivos() {
     return Container(
-      padding: const EdgeInsets.all(18),
+      width: double.infinity,
+      padding: const EdgeInsets.all(28),
       decoration: BoxDecoration(
         color: _panel,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: _border),
       ),
       child: Column(
+        children: [
+          const Icon(Icons.devices_other_rounded, color: _mint, size: 48),
+          const SizedBox(height: 15),
+          const Text(
+            'Nenhum dispositivo cadastrado',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: _fg,
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Sua casa ainda não possui dispositivos.\n'
+            'Adicione seu primeiro dispositivo!',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: _muted, fontSize: 12),
+          ),
+          const SizedBox(height: 20),
+          ElevatedButton.icon(
+            onPressed: () => _selecionarAba(1),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _mint,
+              foregroundColor: _bg,
+            ),
+            icon: const Icon(Icons.add),
+            label: const Text('Adicionar dispositivo'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // =====================================================
+  // CARTÃO DE ENERGIA ORIGINAL
+  // =====================================================
+
+  Widget _cartaoEnergia() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: _panel,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: _border),
+      ),
+      child: const Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          Row(
             children: [
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Consumo semanal',
-                      style: TextStyle(color: _muted, fontSize: 12),
-                    ),
-                    SizedBox(height: 7),
-                    Text(
-                      'Dados de exemplo',
-                      style: TextStyle(
-                        color: _fg,
-                        fontSize: 19,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ],
+                child: Text(
+                  'Consumo semanal',
+                  style: TextStyle(
+                    color: _fg,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
               Icon(Icons.bar_chart_rounded, color: _mint, size: 26),
             ],
           ),
-          const SizedBox(height: 24),
-          SizedBox(
-            height: 112,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: List.generate(valores.length, (index) {
-                final selecionado = index == 5;
-
-                return Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 5),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        Expanded(
-                          child: Align(
-                            alignment: Alignment.bottomCenter,
-                            child: FractionallySizedBox(
-                              heightFactor: valores[index],
-                              widthFactor: 1,
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: selecionado
-                                      ? _mint
-                                      : _mint.withValues(alpha: 0.20),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          dias[index],
-                          style: TextStyle(
-                            color: selecionado ? _mint : _muted,
-                            fontSize: 9,
-                            fontWeight: selecionado
-                                ? FontWeight.w800
-                                : FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              }),
+          SizedBox(height: 20),
+          Center(
+            child: Column(
+              children: [
+                Icon(Icons.bolt_outlined, color: _muted, size: 38),
+                SizedBox(height: 10),
+                Text(
+                  'Nenhum dado de consumo disponível',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: _muted, fontSize: 12),
+                ),
+              ],
             ),
           ),
         ],
@@ -1402,7 +1550,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  // =====================================================
+  // GRADE DE AMBIENTES
+  // =====================================================
+
   Widget _gradeAmbientes() {
+    if (_ambientes.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 20),
+        child: Text(
+          'Nenhum ambiente cadastrado.',
+          style: TextStyle(color: _muted),
+        ),
+      );
+    }
+
     return GridView.builder(
       itemCount: _ambientes.length,
       shrinkWrap: true,
@@ -1416,68 +1578,69 @@ class _DashboardScreenState extends State<DashboardScreen> {
       itemBuilder: (context, index) {
         final ambiente = _ambientes[index];
 
-        return InkWell(
-          borderRadius: BorderRadius.circular(18),
-          onTap: () =>
-              _mostrarMensagem('Ambiente "${ambiente.nome}" selecionado.'),
-          child: Container(
-            padding: const EdgeInsets.all(15),
-            decoration: BoxDecoration(
-              color: _panel,
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: _border),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 42,
-                  height: 42,
-                  decoration: BoxDecoration(
-                    color: _panel2,
-                    borderRadius: BorderRadius.circular(13),
-                  ),
-                  child: Icon(ambiente.icone, color: _mint, size: 22),
+        return Container(
+          padding: const EdgeInsets.all(15),
+          decoration: BoxDecoration(
+            color: _panel,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: _border),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: _panel2,
+                  borderRadius: BorderRadius.circular(13),
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        ambiente.nome,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: _fg,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                        ),
+                child: Icon(ambiente.icone, color: _mint, size: 22),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      ambiente.nome,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: _fg,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
                       ),
-                      const SizedBox(height: 5),
-                      Text(
-                        _resumoAmbiente(ambiente),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: _muted, fontSize: 9),
-                      ),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      '${_quantidadeNoAmbiente(ambiente.nome)} '
+                      'dispositivos',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: _muted, fontSize: 9),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         );
       },
     );
   }
 
-  Widget _atalhos() {
-    if (_atalhosSalvos.isEmpty) {
+  // =====================================================
+  // GRADE DE ATALHOS
+  // =====================================================
+
+  Widget _gradeAtalhos() {
+    if (_atalhos.isEmpty) {
       return const Padding(
         padding: EdgeInsets.symmetric(vertical: 12),
         child: Text(
-          'Nenhum modo criado. Toque em “＋ Criar” para adicionar um.',
+          'Nenhum modo criado. '
+          'Toque em “＋ Criar” para adicionar um.',
           style: TextStyle(color: _muted),
         ),
       );
@@ -1486,19 +1649,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final largura = (constraints.maxWidth - 12) / 2;
+
         return Wrap(
           spacing: 12,
           runSpacing: 12,
           children: [
-            for (final atalho in _atalhosSalvos)
+            for (final atalho in _atalhos)
               SizedBox(
                 width: largura,
-                child: _ShortcutCard(
-                  titulo: atalho.nome,
-                  descricao: _resumoAtalho(atalho),
-                  onTap: () => _ativarAtalho(atalho),
-                  onEdit: () => _editarAtalho(atalho),
-                  onDelete: () => _excluirAtalho(atalho),
+                child: _AtalhoCard(
+                  nome: atalho.nome,
+                  quantidade: atalho.configuracoes.length,
+                  onExecutar: () => _ativarAtalho(atalho),
+                  onEditar: () => _editarAtalho(atalho),
+                  onExcluir: () => _excluirAtalho(atalho),
                 ),
               ),
           ],
@@ -1506,55 +1670,58 @@ class _DashboardScreenState extends State<DashboardScreen> {
       },
     );
   }
-
-  String _resumoAtalho(_AtalhoData atalho) {
-    final ambientes = atalho.configuracoes.length;
-    final dispositivos = atalho.configuracoes.values.fold<int>(
-      0,
-      (quantidade, configurados) => quantidade + configurados.length,
-    );
-    return '$ambientes ${ambientes == 1 ? 'ambiente' : 'ambientes'} • '
-        '$dispositivos ${dispositivos == 1 ? 'dispositivo' : 'dispositivos'}';
-  }
 }
 
-class _DeviceData {
-  static int _nextId = 0;
+// =====================================================
+// MODELO DE AMBIENTE
+// =====================================================
 
-  final String id;
-  final String nome;
-  String local;
+class _Ambiente {
+  String nome;
   final IconData icone;
-  bool ligado;
-  final bool online;
 
-  _DeviceData({
-    String? id,
-    required this.nome,
-    required this.local,
-    required this.icone,
-    required this.ligado,
-    this.online = true,
-  }) : id = id ?? 'device-${_nextId++}';
+  _Ambiente({required this.nome, required this.icone});
 }
 
-class _DeviceCard extends StatelessWidget {
-  final _DeviceData data;
+// =====================================================
+// MODELO DE ATALHO
+// =====================================================
+
+class _Atalho {
+  final String nome;
+  final Map<String, bool> configuracoes;
+
+  _Atalho({required this.nome, required this.configuracoes});
+}
+
+// =====================================================
+// CARD DE DISPOSITIVO
+// =====================================================
+
+class _DispositivoCard extends StatelessWidget {
+  final String nome;
+  final String ambiente;
+  final IconData icone;
+  final bool ligado;
   final ValueChanged<bool> onChanged;
 
-  const _DeviceCard({required this.data, required this.onChanged});
+  const _DispositivoCard({
+    required this.nome,
+    required this.ambiente,
+    required this.icone,
+    required this.ligado,
+    required this.onChanged,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final ativo = data.ligado;
-
     return Container(
       padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
         color: _panel,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: ativo ? _mint.withValues(alpha: 0.38) : _border,
+          color: ligado ? _mint.withValues(alpha: 0.38) : _border,
         ),
       ),
       child: Column(
@@ -1566,18 +1733,14 @@ class _DeviceCard extends StatelessWidget {
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: ativo ? _mint.withValues(alpha: 0.12) : _panel2,
+                  color: ligado ? _mint.withValues(alpha: 0.12) : _panel2,
                   borderRadius: BorderRadius.circular(13),
                 ),
-                child: Icon(
-                  data.icone,
-                  color: ativo ? _mint : _muted,
-                  size: 22,
-                ),
+                child: Icon(icone, color: ligado ? _mint : _muted, size: 22),
               ),
               const Spacer(),
               Switch.adaptive(
-                value: ativo,
+                value: ligado,
                 onChanged: onChanged,
                 activeThumbColor: _mint,
                 activeTrackColor: _mint.withValues(alpha: 0.35),
@@ -1586,7 +1749,7 @@ class _DeviceCard extends StatelessWidget {
           ),
           const Spacer(),
           Text(
-            data.nome,
+            nome,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
@@ -1596,32 +1759,16 @@ class _DeviceCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 5),
-          Row(
-            children: [
-              Container(
-                width: 6,
-                height: 6,
-                decoration: BoxDecoration(
-                  color: ativo ? _mint : _muted,
-                  shape: BoxShape.circle,
-                ),
-              ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  ativo ? 'Ligado' : 'Desligado',
-                  style: const TextStyle(color: _muted, fontSize: 10),
-                ),
-              ),
-              Flexible(
-                child: Text(
-                  data.local,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: _muted, fontSize: 9),
-                ),
-              ),
-            ],
+          Text(
+            ambiente,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(color: _muted, fontSize: 10),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            ligado ? '● Ligado' : '● Desligado',
+            style: TextStyle(color: ligado ? _mint : _muted, fontSize: 10),
           ),
         ],
       ),
@@ -1629,45 +1776,30 @@ class _DeviceCard extends StatelessWidget {
   }
 }
 
-class _RoomData {
-  String nome;
-  final List<String> dispositivos;
-  final IconData icone;
+// =====================================================
+// CARD DE ATALHO
+// =====================================================
 
-  _RoomData({
+class _AtalhoCard extends StatelessWidget {
+  final String nome;
+  final int quantidade;
+  final VoidCallback onExecutar;
+  final VoidCallback onEditar;
+  final VoidCallback onExcluir;
+
+  const _AtalhoCard({
     required this.nome,
-    required this.dispositivos,
-    required this.icone,
-  });
-}
-
-class _AtalhoData {
-  String nome;
-  final Map<_RoomData, Map<_DeviceData, bool>> configuracoes;
-
-  _AtalhoData({required this.nome, required this.configuracoes});
-}
-
-class _ShortcutCard extends StatelessWidget {
-  final String titulo;
-  final String descricao;
-  final VoidCallback onTap;
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
-
-  const _ShortcutCard({
-    required this.titulo,
-    required this.descricao,
-    required this.onTap,
-    required this.onEdit,
-    required this.onDelete,
+    required this.quantidade,
+    required this.onExecutar,
+    required this.onEditar,
+    required this.onExcluir,
   });
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
       borderRadius: BorderRadius.circular(18),
-      onTap: onTap,
+      onTap: onExecutar,
       child: Container(
         padding: const EdgeInsets.all(15),
         decoration: BoxDecoration(
@@ -1686,12 +1818,18 @@ class _ShortcutCard extends StatelessWidget {
                   tooltip: 'Opções do modo',
                   icon: const Icon(Icons.more_vert, color: _muted, size: 20),
                   onSelected: (opcao) {
-                    if (opcao == 'editar') onEdit();
-                    if (opcao == 'excluir') onDelete();
+                    if (opcao == 'editar') {
+                      onEditar();
+                    } else if (opcao == 'excluir') {
+                      onExcluir();
+                    }
                   },
                   itemBuilder: (context) => const [
-                    PopupMenuItem(value: 'editar', child: Text('Editar modo')),
-                    PopupMenuItem(
+                    PopupMenuItem<String>(
+                      value: 'editar',
+                      child: Text('Editar modo'),
+                    ),
+                    PopupMenuItem<String>(
                       value: 'excluir',
                       child: Text('Excluir modo'),
                     ),
@@ -1701,7 +1839,7 @@ class _ShortcutCard extends StatelessWidget {
             ),
             const SizedBox(height: 7),
             Text(
-              titulo,
+              nome,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
@@ -1712,10 +1850,8 @@ class _ShortcutCard extends StatelessWidget {
             ),
             const SizedBox(height: 5),
             Text(
-              descricao,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: _muted, fontSize: 10, height: 1.4),
+              '$quantidade dispositivos',
+              style: const TextStyle(color: _muted, fontSize: 10),
             ),
           ],
         ),

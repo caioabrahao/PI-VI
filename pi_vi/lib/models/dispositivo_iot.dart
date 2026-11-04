@@ -7,6 +7,7 @@ class DispositivoIot {
   final String tipo;
   final String? ambienteId;
   final String statusConexao;
+  final bool ligado;
   final DateTime? ultimaConexaoEm;
   final DateTime criadoEm;
   final DateTime atualizadoEm;
@@ -18,32 +19,41 @@ class DispositivoIot {
     required this.tipo,
     required this.ambienteId,
     required this.statusConexao,
+    this.ligado = false,
     required this.ultimaConexaoEm,
     required this.criadoEm,
     required this.atualizadoEm,
   });
 
-  factory DispositivoIot.fromFirestore(
-    String id,
-    Map<String, dynamic> dados,
-  ) {
+  factory DispositivoIot.fromFirestore(String id, Map<String, dynamic> dados) {
     return DispositivoIot(
       id: id,
       nome: dados['nome'] as String,
       identificador: dados['identificador'] as String,
       tipo: dados['tipo'] as String,
       ambienteId: dados['ambienteId'] as String?,
-      statusConexao: dados['statusConexao'] as String,
+      statusConexao: dados['statusConexao'] as String? ?? 'desconhecido',
+      ligado: dados['ligado'] == true,
       ultimaConexaoEm: _lerData(dados['ultimaConexaoEm']),
-      criadoEm: _lerData(dados['criadoEm'])!,
-      atualizadoEm: _lerData(dados['atualizadoEm'])!,
+      criadoEm:
+          _lerData(dados['criadoEm']) ?? DateTime.fromMillisecondsSinceEpoch(0),
+      atualizadoEm:
+          _lerData(dados['atualizadoEm']) ??
+          DateTime.fromMillisecondsSinceEpoch(0),
     );
   }
 
   static DateTime? _lerData(Object? valor) {
     if (valor == null) return null;
-    if (valor is Timestamp) return valor.toDate();
-    if (valor is DateTime) return valor;
+
+    if (valor is Timestamp) {
+      return valor.toDate();
+    }
+
+    if (valor is DateTime) {
+      return valor;
+    }
+
     throw FormatException('Data inválida no cadastro do dispositivo.');
   }
 }

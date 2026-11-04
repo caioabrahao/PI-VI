@@ -6,10 +6,12 @@ import 'firebase_service.dart';
 class DispositivoIotService {
   static final FirebaseFirestore _db = FirebaseFirestore.instance;
 
+  // Coleção exclusiva do usuário autenticado
   static CollectionReference<Map<String, dynamic>> _colecaoDoUsuario({
     String? uid,
   }) {
     final usuarioId = uid ?? FirebaseService.usuarioAtual?.uid;
+
     if (usuarioId == null) {
       throw StateError('Faça login para gerenciar dispositivos IoT.');
     }
@@ -20,6 +22,7 @@ class DispositivoIotService {
         .collection('dispositivosIot');
   }
 
+  // Cadastrar dispositivo
   static Future<DispositivoIot> cadastrar({
     required String nome,
     required String identificador,
@@ -27,18 +30,23 @@ class DispositivoIotService {
     String? ambienteId,
   }) async {
     final uid = FirebaseService.usuarioAtual?.uid;
+
     if (uid == null) {
       throw StateError('Faça login para gerenciar dispositivos IoT.');
     }
 
     final nomeValidado = _validarTexto(nome, 'nome', 80);
+
     final identificadorValidado = _validarTexto(
       identificador,
       'identificador',
       128,
     );
+
     final tipoValidado = _validarTexto(tipo, 'tipo', 50);
+
     final ambienteValidado = ambienteId?.trim();
+
     if (ambienteValidado != null && ambienteValidado.isEmpty) {
       throw ArgumentError.value(
         ambienteId,
@@ -48,15 +56,21 @@ class DispositivoIotService {
     }
 
     final colecao = _colecaoDoUsuario(uid: uid);
+
     final existentes = await colecao
         .where('identificador', isEqualTo: identificadorValidado)
         .limit(1)
         .get();
+
     if (existentes.docs.isNotEmpty) {
-      throw StateError('Já existe um dispositivo IoT com esse identificador.');
+      throw StateError(
+        'Já existe um dispositivo IoT '
+        'com esse identificador.',
+      );
     }
 
     final agora = FieldValue.serverTimestamp();
+
     final referencia = await colecao.add({
       'uid': uid,
       'nome': nomeValidado,
@@ -64,6 +78,7 @@ class DispositivoIotService {
       'tipo': tipoValidado,
       'ambienteId': ambienteValidado,
       'statusConexao': 'desconhecido',
+      'ligado': false,
       'ultimaConexaoEm': null,
       'criadoEm': agora,
       'atualizadoEm': agora,
@@ -71,36 +86,48 @@ class DispositivoIotService {
 
     final documento = await referencia.get();
     final dados = documento.data();
+
     if (!documento.exists || dados == null) {
-      throw StateError('Não foi possível carregar o dispositivo IoT cadastrado.');
+      throw StateError(
+        'Não foi possível carregar '
+        'o dispositivo IoT cadastrado.',
+      );
     }
 
     return DispositivoIot.fromFirestore(documento.id, dados);
   }
 
+  // Consultar dispositivos em tempo real
   static Stream<List<DispositivoIot>> observarDispositivos() {
     return _colecaoDoUsuario()
         .orderBy('criadoEm', descending: true)
         .snapshots()
-        .map(
-          (snapshot) => snapshot.docs
-              .map(
-                (documento) => DispositivoIot.fromFirestore(
+        .map((snapshot) {
+          return snapshot.docs
+              .map((documento) {
+                return DispositivoIot.fromFirestore(
                   documento.id,
                   documento.data(),
-                ),
-              )
-              .toList(growable: false),
-        );
+                );
+              })
+              .toList(growable: false);
+        });
   }
 
+  // Buscar um dispositivo
   static Future<DispositivoIot?> obter(String id) async {
     final documento = await _colecaoDoUsuario().doc(id).get();
+
     final dados = documento.data();
-    if (!documento.exists || dados == null) return null;
+
+    if (!documento.exists || dados == null) {
+      return null;
+    }
+
     return DispositivoIot.fromFirestore(documento.id, dados);
   }
 
+  // Atualizar cadastro
   static Future<void> atualizarCadastro({
     required String id,
     required String nome,
@@ -109,13 +136,17 @@ class DispositivoIotService {
     String? ambienteId,
   }) async {
     final nomeValidado = _validarTexto(nome, 'nome', 80);
+
     final identificadorValidado = _validarTexto(
       identificador,
       'identificador',
       128,
     );
+
     final tipoValidado = _validarTexto(tipo, 'tipo', 50);
+
     final ambienteValidado = ambienteId?.trim();
+
     if (ambienteValidado != null && ambienteValidado.isEmpty) {
       throw ArgumentError.value(
         ambienteId,
@@ -125,11 +156,16 @@ class DispositivoIotService {
     }
 
     final colecao = _colecaoDoUsuario();
+
     final repetidos = await colecao
         .where('identificador', isEqualTo: identificadorValidado)
         .get();
+
     if (repetidos.docs.any((documento) => documento.id != id)) {
-      throw StateError('Já existe um dispositivo IoT com esse identificador.');
+      throw StateError(
+        'Já existe um dispositivo IoT '
+        'com esse identificador.',
+      );
     }
 
     await colecao.doc(id).update({
@@ -141,20 +177,39 @@ class DispositivoIotService {
     });
   }
 
+  // Ligar e desligar dispositivo no Firestore
+  static Future<void> alterarEstado({
+    required String id,
+    required bool ligado,
+  }) async {
+    await _colecaoDoUsuario().doc(id).update({
+      'ligado': ligado,
+      'atualizadoEm': FieldValue.serverTimestamp(),
+    });
+  }
+
+  // Atualizar status de conexão
   static Future<void> atualizarStatusConexao({
     required String id,
     required String status,
   }) async {
     const statusPermitidos = {'desconhecido', 'conectado', 'desconectado'};
+
     if (!statusPermitidos.contains(status)) {
-      throw ArgumentError.value(status, 'status', 'Status de conexão inválido.');
+      throw ArgumentError.value(
+        status,
+        'status',
+        'Status de conexão inválido.',
+      );
     }
 
     final agora = FieldValue.serverTimestamp();
+
     final atualizacao = <String, Object?>{
       'statusConexao': status,
       'atualizadoEm': agora,
     };
+
     if (status == 'conectado') {
       atualizacao['ultimaConexaoEm'] = agora;
     }
@@ -162,19 +217,24 @@ class DispositivoIotService {
     await _colecaoDoUsuario().doc(id).update(atualizacao);
   }
 
+  // Excluir dispositivo
   static Future<void> excluir(String id) async {
     await _colecaoDoUsuario().doc(id).delete();
   }
 
+  // Validar campos
   static String _validarTexto(String valor, String campo, int tamanhoMaximo) {
     final texto = valor.trim();
+
     if (texto.isEmpty || texto.length > tamanhoMaximo) {
       throw ArgumentError.value(
         valor,
         campo,
-        'Informe um valor entre 1 e $tamanhoMaximo caracteres.',
+        'Informe um valor entre 1 '
+        'e $tamanhoMaximo caracteres.',
       );
     }
+
     return texto;
   }
 }

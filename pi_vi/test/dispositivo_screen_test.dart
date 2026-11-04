@@ -1,162 +1,273 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pi_vi/screens/dashboard.dart';
+
 import 'package:pi_vi/screens/dispositivo.dart';
 
+// =====================================================
+// TESTES DO COS - DISPOSITIVOS
+//
+// Estes testes verificam a interface e o cadastro
+// manual sem depender de autenticação ou Firestore.
+// =====================================================
+
 void main() {
-  testWidgets('exibe dispositivos e navegação compartilhada', (tester) async {
-    final alterados = <String>[];
-    final adicionados = <DispositivoListaItem>[];
+  // ===================================================
+  // TESTE 1 - EXIBE A TELA DE ADICIONAR DISPOSITIVO
+  // ===================================================
+
+  testWidgets('exibe as opções de cadastro de dispositivo', (
+    WidgetTester tester,
+  ) async {
     await tester.pumpWidget(
-      MaterialApp(
-        home: DispositivoScreen(
-          dispositivos: const [
-            DispositivoListaItem(
-              nome: 'Luz da sala',
-              ambiente: 'Sala',
-              icone: Icons.lightbulb_outline_rounded,
-              ligado: true,
-            ),
-            DispositivoListaItem(
-              nome: 'Tomada do quarto',
-              ambiente: 'Quarto',
-              icone: Icons.power_rounded,
-              ligado: false,
-              online: false,
-            ),
-          ],
-          ambientes: const ['Sala', 'Quarto'],
-          onToggle: alterados.add,
-          onAddDevice: adicionados.add,
-          onNavigate: (_) {},
+      const MaterialApp(
+        home: AdicionarDispositivoScreen(
+          ambientes: ['Sala', 'Quarto'],
+          nomesExistentes: {},
         ),
       ),
     );
 
-    expect(find.text('COS'), findsOneWidget);
-    expect(find.text('Dispositivos'), findsNWidgets(2));
-    expect(find.text('1 online · 1 offline'), findsOneWidget);
-    expect(find.text('Início'), findsOneWidget);
-    expect(find.text('Automações'), findsOneWidget);
-    expect(find.text('Alertas'), findsOneWidget);
-    expect(find.text('Perfil'), findsOneWidget);
-    expect(find.text('Luz da sala'), findsOneWidget);
-    expect(find.text('Tomada do quarto'), findsOneWidget);
+    expect(find.text('Adicionar dispositivo'), findsOneWidget);
 
-    await tester.tap(find.byType(Switch).first);
-    await tester.pumpAndSettle();
-    expect(alterados, ['Luz da sala']);
-
-    await tester.tap(find.byTooltip('Adicionar dispositivo'));
-    await tester.pumpAndSettle();
     expect(find.text('Escolha como deseja começar'), findsOneWidget);
+
     expect(find.text('Procurar por perto'), findsOneWidget);
+
     expect(find.text('Selecionar por tipo'), findsOneWidget);
+
+    expect(find.text('Iluminação'), findsOneWidget);
+
+    expect(find.text('Tomada'), findsOneWidget);
+  });
+
+  // ===================================================
+  // TESTE 2 - CADASTRAR UM DISPOSITIVO POR TIPO
+  // ===================================================
+
+  testWidgets('permite cadastrar uma lâmpada na sala', (
+    WidgetTester tester,
+  ) async {
+    DispositivoListaItem? dispositivoAdicionado;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) {
+            return Scaffold(
+              body: Center(
+                child: ElevatedButton(
+                  onPressed: () async {
+                    dispositivoAdicionado = await Navigator.of(context)
+                        .push<DispositivoListaItem>(
+                          MaterialPageRoute(
+                            builder: (_) => const AdicionarDispositivoScreen(
+                              ambientes: ['Sala', 'Quarto'],
+                              nomesExistentes: {},
+                            ),
+                          ),
+                        );
+                  },
+                  child: const Text('Abrir cadastro'),
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+
+    // Abre a tela de cadastro.
+    await tester.tap(find.text('Abrir cadastro'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Escolha como deseja começar'), findsOneWidget);
+
+    // Seleciona a categoria Iluminação.
+    await tester.ensureVisible(find.text('Iluminação'));
+
     await tester.tap(find.text('Iluminação'));
     await tester.pumpAndSettle();
+
+    // Preenche o nome do dispositivo.
     await tester.enterText(find.byType(TextFormField).first, 'Luz da varanda');
-    await tester.tap(find.text('Adicionar'));
+
+    // Salva o dispositivo.
+    await tester.tap(find.text('Adicionar').last);
     await tester.pumpAndSettle();
 
-    expect(adicionados, hasLength(1));
-    expect(adicionados.single.nome, 'Luz da varanda');
-    expect(find.text('Luz da varanda'), findsOneWidget);
-    expect(find.text('Casa do Paulo'), findsOneWidget);
+    // Verifica se os dados foram retornados.
+    expect(dispositivoAdicionado, isNotNull);
+
+    expect(dispositivoAdicionado!.nome, 'Luz da varanda');
+
+    expect(dispositivoAdicionado!.ambiente, 'Sala');
+
+    expect(dispositivoAdicionado!.icone, Icons.lightbulb_outline_rounded);
+
+    expect(dispositivoAdicionado!.ligado, isFalse);
   });
 
-  testWidgets('filtra dispositivos pelo ambiente', (tester) async {
-    await tester.pumpWidget(
-      MaterialApp(
-        home: DispositivoScreen(
-          dispositivos: const [
-            DispositivoListaItem(
-              nome: 'Luz da sala',
-              ambiente: 'Sala',
-              icone: Icons.lightbulb_outline_rounded,
-              ligado: true,
-            ),
-            DispositivoListaItem(
-              nome: 'Tomada do quarto',
-              ambiente: 'Quarto',
-              icone: Icons.power_rounded,
-              ligado: false,
-            ),
-          ],
-          ambientes: const ['Sala', 'Quarto'],
-          onToggle: (_) {},
-          onAddDevice: (_) {},
-          onNavigate: (_) {},
-        ),
-      ),
-    );
+  // ===================================================
+  // TESTE 3 - BUSCA POR UM MODELO DESCONHECIDO
+  // ===================================================
 
-    await tester.tap(find.text('Quarto').first);
-    await tester.pumpAndSettle();
-
-    expect(find.text('Tomada do quarto'), findsOneWidget);
-    expect(find.text('Luz da sala'), findsNothing);
-  });
-
-  testWidgets('permite continuar por outros ao buscar um modelo', (
-    tester,
+  testWidgets('permite adicionar um modelo desconhecido em Outros', (
+    WidgetTester tester,
   ) async {
-    final adicionados = <DispositivoListaItem>[];
+    DispositivoListaItem? dispositivoAdicionado;
+
     await tester.pumpWidget(
       MaterialApp(
-        home: DispositivoScreen(
-          dispositivos: const [],
-          ambientes: const ['Sala'],
-          onToggle: (_) {},
-          onAddDevice: adicionados.add,
-          onNavigate: (_) {},
+        home: Builder(
+          builder: (context) {
+            return Scaffold(
+              body: Center(
+                child: ElevatedButton(
+                  onPressed: () async {
+                    dispositivoAdicionado = await Navigator.of(context)
+                        .push<DispositivoListaItem>(
+                          MaterialPageRoute(
+                            builder: (_) => const AdicionarDispositivoScreen(
+                              ambientes: ['Sala'],
+                              nomesExistentes: {},
+                            ),
+                          ),
+                        );
+                  },
+                  child: const Text('Abrir cadastro'),
+                ),
+              ),
+            );
+          },
         ),
       ),
     );
 
-    await tester.tap(find.byTooltip('Adicionar dispositivo'));
+    await tester.tap(find.text('Abrir cadastro'));
     await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField).last, 'Sensor XYZ');
+
+    // Procura um modelo não listado.
+    await tester.enterText(find.byType(TextField).first, 'Sensor XYZ');
+
     await tester.pumpAndSettle();
 
     expect(find.text('Adicionar em Outros'), findsOneWidget);
+
+    // Seleciona a opção Outros.
     await tester.tap(find.text('Adicionar em Outros'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Adicionar outros'));
-    await tester.pumpAndSettle();
 
-    expect(find.byType(TextFormField), findsOneWidget);
-    expect(
-      tester.widget<TextFormField>(find.byType(TextFormField)).controller?.text,
-      'Sensor XYZ',
+    // O nome pesquisado deve aparecer
+    // automaticamente no formulário.
+    final campoNome = tester.widget<TextFormField>(
+      find.byType(TextFormField).first,
     );
-    await tester.tap(find.text('Adicionar'));
+
+    expect(campoNome.controller?.text, 'Sensor XYZ');
+
+    // Confirma o cadastro.
+    await tester.tap(find.text('Adicionar').last);
     await tester.pumpAndSettle();
 
-    expect(adicionados.single.nome, 'Sensor XYZ');
-    expect(adicionados.single.ambiente, 'Sala');
+    expect(dispositivoAdicionado, isNotNull);
+
+    expect(dispositivoAdicionado!.nome, 'Sensor XYZ');
+
+    expect(dispositivoAdicionado!.ambiente, 'Sala');
+
+    expect(dispositivoAdicionado!.ligado, isFalse);
   });
 
-  testWidgets('navega do dashboard para dispositivos e volta ao início', (
-    tester,
-  ) async {
-    await tester.pumpWidget(const MaterialApp(home: DashboardScreen()));
+  // ===================================================
+  // TESTE 4 - NÃO PERMITIR NOMES DUPLICADOS
+  // ===================================================
 
-    await tester.tap(find.text('Dispositivos').last);
+  testWidgets('não permite cadastrar dois dispositivos com o mesmo nome', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: AdicionarDispositivoScreen(
+          ambientes: ['Sala'],
+          nomesExistentes: {'Luz da sala'},
+        ),
+      ),
+    );
+
+    // Abre a categoria Iluminação.
+    await tester.ensureVisible(find.text('Iluminação'));
+
+    await tester.tap(find.text('Iluminação'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Casa do Paulo'), findsOneWidget);
-    expect(find.text('Todos · 6'), findsOneWidget);
-    expect(find.text('Offline · 1'), findsOneWidget);
+    // Digita um nome já existente.
+    await tester.enterText(find.byType(TextFormField).first, 'Luz da sala');
+
+    // Tenta cadastrar.
+    await tester.tap(find.text('Adicionar').last);
+    await tester.pumpAndSettle();
+
+    // A validação deve impedir a duplicação.
     expect(
-      find.text('Sala de estar · Sem resposta à rede Wi-Fi'),
+      find.text('Já existe um dispositivo com esse nome.'),
       findsOneWidget,
     );
-    expect(find.text('OFFLINE'), findsOneWidget);
+  });
 
-    await tester.tap(find.text('Início').last);
+  // ===================================================
+  // TESTE 5 - VALIDAR NOME OBRIGATÓRIO
+  // ===================================================
+
+  testWidgets('exige o nome do dispositivo', (WidgetTester tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: AdicionarDispositivoScreen(
+          ambientes: ['Sala'],
+          nomesExistentes: {},
+        ),
+      ),
+    );
+
+    // Abre a categoria Iluminação.
+    await tester.ensureVisible(find.text('Iluminação'));
+
+    await tester.tap(find.text('Iluminação'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Seu espaço, suas regras.'), findsOneWidget);
-    expect(find.text('Casa do Paulo'), findsNothing);
+    // Deixa o nome em branco.
+    await tester.enterText(find.byType(TextFormField).first, '');
+
+    // Tenta adicionar sem nome.
+    await tester.tap(find.text('Adicionar').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Informe o nome do dispositivo.'), findsOneWidget);
+  });
+
+  // ===================================================
+  // TESTE 6 - MODELO DO DISPOSITIVO
+  // ===================================================
+
+  test('DispositivoListaItem guarda os dados corretamente', () {
+    const dispositivo = DispositivoListaItem(
+      id: 'dispositivo-123',
+      nome: 'Tomada do quarto',
+      ambiente: 'Quarto',
+      icone: Icons.power_rounded,
+      ligado: false,
+      online: false,
+    );
+
+    expect(dispositivo.id, 'dispositivo-123');
+
+    expect(dispositivo.nome, 'Tomada do quarto');
+
+    expect(dispositivo.ambiente, 'Quarto');
+
+    expect(dispositivo.icone, Icons.power_rounded);
+
+    expect(dispositivo.ligado, isFalse);
+
+    expect(dispositivo.online, isFalse);
   });
 }
