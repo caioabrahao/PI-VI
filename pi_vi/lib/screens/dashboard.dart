@@ -3,11 +3,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'automacao.dart';
+import 'alertas.dart';
 import 'dispositivo.dart';
 import 'perfil.dart';
 import 'splash_screen.dart';
 
 import '../models/dispositivo_iot.dart';
+import '../models/alerta.dart';
 import '../services/dispositivo_iot_service.dart';
 import '../services/firebase_service.dart';
 import '../widgets/cos_app_navigation.dart';
@@ -45,6 +47,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   String? _erro;
 
   final AutomacaoData _automacaoData = AutomacaoData();
+  final AlertasData _alertasData = AlertasData(alertas: const []);
 
   final List<_Ambiente> _ambientes = [
     _Ambiente(nome: 'Sala de estar', icone: Icons.weekend_outlined),
@@ -111,6 +114,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void dispose() {
     _assinatura?.cancel();
+    _alertasData.dispose();
     super.dispose();
   }
 
@@ -412,7 +416,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
         return;
 
       case 3:
-        _mostrarMensagem('Você não tem alertas novos.');
+        await Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => AlertasScreen(
+              data: _alertasData,
+              onNavigate: (aba) => _navegarDaSubtela(aba, 3),
+            ),
+          ),
+        );
         return;
 
       case 4:
