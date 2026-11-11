@@ -1,6 +1,9 @@
 # COS HUB 💡
 ### Plataforma de Automação e Gerenciamento de Dispositivos IoT
 
+> A documentação técnica detalhada está em [`docs/`](docs/), com arquitetura,
+> fluxos, Firebase, desenvolvimento, testes e limitações conhecidas.
+
 O **COS HUB** é um projeto acadêmico desenvolvido no âmbito do Projeto Integrador VI da Pontifícia Universidade Católica de Campinas (PUC-Campinas). A proposta consiste no desenvolvimento de uma plataforma centralizada para organizar ambientes e controlar dispositivos de Internet das Coisas (IoT) por meio de uma aplicação multiplataforma.
 
 O projeto busca integrar software, backend e hardware em uma solução que permita ao usuário gerenciar seus dispositivos inteligentes de maneira simples e intuitiva.
