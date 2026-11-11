@@ -17,6 +17,7 @@ service cloud.firestore {
               'tipo',
               'ambienteId',
               'statusConexao',
+              'ligado',
               'ultimaConexaoEm',
               'criadoEm',
               'atualizadoEm'
@@ -57,6 +58,10 @@ service cloud.firestore {
             && (
               request.resource.data.ultimaConexaoEm == null
               || request.resource.data.ultimaConexaoEm is timestamp
+            )
+            && (
+              !('ligado' in request.resource.data)
+              || request.resource.data.ligado is bool
             )
             && request.resource.data.criadoEm is timestamp
             && request.resource.data.atualizadoEm is timestamp;

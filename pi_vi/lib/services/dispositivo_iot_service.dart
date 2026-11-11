@@ -1,7 +1,11 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../models/dispositivo_iot.dart';
+import '../models/estado_lampada.dart';
 import 'firebase_service.dart';
+import 'servico_mqtt.dart';
 
 class DispositivoIotService {
   static final FirebaseFirestore _db = FirebaseFirestore.instance;
@@ -98,7 +102,49 @@ class DispositivoIotService {
   }
 
   // Consultar dispositivos em tempo real
+  //
+  // Lâmpadas SmartLight recebem `ligado` e `statusConexao` ao vivo do MQTT
+  // (ver ServicoMqtt.aplicarEstado); os outros dispositivos vêm só do Firestore.
   static Stream<List<DispositivoIot>> observarDispositivos() {
+    return _comEstadoMqtt(_observarCadastro());
+  }
+
+  static Stream<List<DispositivoIot>> _comEstadoMqtt(
+    Stream<List<DispositivoIot>> cadastro,
+  ) {
+    final mqtt = ServicoMqtt.instancia;
+    late final StreamController<List<DispositivoIot>> saida;
+    StreamSubscription<List<DispositivoIot>>? assinaturaCadastro;
+    StreamSubscription<String>? assinaturaMqtt;
+    List<DispositivoIot>? ultimoCadastro;
+
+    void emitir() {
+      final lista = ultimoCadastro;
+      if (lista == null || saida.isClosed) return;
+      saida.add(lista.map(mqtt.aplicarEstado).toList(growable: false));
+    }
+
+    saida = StreamController<List<DispositivoIot>>(
+      onListen: () {
+        assinaturaCadastro = cadastro.listen((lista) {
+          ultimoCadastro = lista;
+          if (lista.any((d) => d.usaMqtt)) mqtt.garantirConexao();
+          emitir();
+        }, onError: saida.addError);
+        assinaturaMqtt = mqtt.mudancas.listen((_) => emitir());
+        mqtt.status.addListener(emitir);
+      },
+      onCancel: () async {
+        mqtt.status.removeListener(emitir);
+        await assinaturaMqtt?.cancel();
+        await assinaturaCadastro?.cancel();
+      },
+    );
+
+    return saida.stream;
+  }
+
+  static Stream<List<DispositivoIot>> _observarCadastro() {
     return _colecaoDoUsuario()
         .orderBy('criadoEm', descending: true)
         .snapshots()
@@ -175,6 +221,22 @@ class DispositivoIotService {
       'ambienteId': ambienteValidado,
       'atualizadoEm': FieldValue.serverTimestamp(),
     });
+  }
+
+  // Ligar e desligar: lâmpadas SmartLight recebem o comando pelo MQTT;
+  // os demais dispositivos só têm o estado salvo no Firestore.
+  static Future<void> ligarOuDesligar(
+    DispositivoIot dispositivo,
+    bool ligado,
+  ) async {
+    if (dispositivo.usaMqtt) {
+      ServicoMqtt.instancia.publicarComando(
+        dispositivo.identificador,
+        EstadoLampada.comando(ligado: ligado),
+      );
+      return;
+    }
+    await alterarEstado(id: dispositivo.id, ligado: ligado);
   }
 
   // Ligar e desligar dispositivo no Firestore

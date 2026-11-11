@@ -39,6 +39,7 @@ dependencies:
   cloud_firestore: ^7.0.0
   google_sign_in: ^7.2.0
   font_awesome_flutter: ^11.0.0
+  mqtt_client: ^10.14.0
 
 dev_dependencies:
   flutter_test:

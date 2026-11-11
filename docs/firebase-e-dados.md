@@ -72,12 +72,8 @@ O acesso exige usuário autenticado e `request.auth.uid == uid`. O proprietário
 pode ler e excluir seus dispositivos; criação e atualização também validam
 campos, tamanhos, status e timestamps.
 
-## Inconsistência conhecida
+## Campo `ligado`
 
-`DispositivoIotService` grava o campo `ligado`, mas a função
-`hasValidDeviceData()` em `firestore.rules` não inclui `ligado` na lista de
-campos permitidos/obrigatórios. Como consequência, operações de criação e
-atualização que enviam esse campo podem ser rejeitadas pelas regras publicadas.
-Essa divergência deve ser resolvida antes de considerar o fluxo completo de
-dispositivos pronto em um ambiente Firebase real.
-
+`firestore.rules` aceita o campo opcional `ligado` (booleano), alinhado com
+`DispositivoIotService`. Para lâmpadas SmartLight o estado ao vivo vem do MQTT
+(ver [integracao-mqtt.md](integracao-mqtt.md)).

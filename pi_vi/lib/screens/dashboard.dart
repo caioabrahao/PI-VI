@@ -140,7 +140,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _adicionarDispositivo(DispositivoListaItem item) async {
-    final identificador = 'app-${DateTime.now().microsecondsSinceEpoch}';
+    final identificador =
+        item.identificador ??
+        '${DispositivoIot.prefixoIdentificadorLocal}'
+            '${DateTime.now().microsecondsSinceEpoch}';
     await DispositivoIotService.cadastrar(
       nome: item.nome,
       identificador: identificador,
@@ -151,10 +154,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Future<void> _alterarEstado(DispositivoIot dispositivo, bool ligado) async {
     try {
-      await DispositivoIotService.alterarEstado(
-        id: dispositivo.id,
-        ligado: ligado,
-      );
+      await DispositivoIotService.ligarOuDesligar(dispositivo, ligado);
     } catch (e) {
       _mostrarMensagem('Erro ao atualizar dispositivo: $e');
     }
