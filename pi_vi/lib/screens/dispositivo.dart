@@ -506,23 +506,33 @@ class _DispositivoScreenState extends State<DispositivoScreen> {
     return TextField(
       controller: _buscaController,
       onChanged: (valor) => setState(() => _busca = valor),
+      style: TextStyle(color: c.fg),
       decoration: InputDecoration(
         hintText: 'Buscar por nome ou ambiente',
-        prefixIcon: const Icon(Icons.search_rounded),
+        hintStyle: TextStyle(color: c.muted),
+        prefixIcon: Icon(Icons.search_rounded, color: c.muted),
         suffixIcon: _busca.isNotEmpty
             ? IconButton(
                 onPressed: () {
                   _buscaController.clear();
                   setState(() => _busca = '');
                 },
-                icon: const Icon(Icons.close),
+                icon: Icon(Icons.close, color: c.muted),
               )
             : null,
         filled: true,
-        fillColor: c.panel,
+        fillColor: c.panel2,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: BorderSide(color: c.border),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(color: c.border),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(color: c.mint, width: 1.5),
         ),
       ),
     );
@@ -832,6 +842,7 @@ class _AdicionarDispositivoScreenState
                 decoration: BoxDecoration(
                   color: c.panel,
                   borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: c.border),
                 ),
                 child: Form(
                   key: _formKey,

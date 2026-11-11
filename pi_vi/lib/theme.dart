@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 
 /// Notifier global do tema. Uma única instância para o app inteiro.
-final ValueNotifier<ThemeMode> perfilThemeMode = ValueNotifier<ThemeMode>(
-  ThemeMode.system,
-);
+final ValueNotifier<ThemeMode> perfilThemeMode =
+    ValueNotifier<ThemeMode>(ThemeMode.system);
 
 /// Paleta do COS resolvida para o brilho atual.
 class CosColors {
@@ -27,28 +26,28 @@ class CosColors {
     required this.mint,
   });
 
-  /// Paleta escura (pública — usada em `automacao.dart`).
+  /// Paleta escura refinada (Deep Forest)
   static const CosColors dark = CosColors(
-    bg: Color(0xFF080B0F),
-    panel: Color(0xFF10151B),
-    panel2: Color(0xFF171E26),
-    panelElevated: Color(0xFF1E2830),
-    border: Color(0xFF293640),
-    muted: Color(0xFF8A98A5),
-    fg: Color(0xFFF1F5F8),
-    mint: Color(0xFF4FE0C0),
+    bg: Color(0xFF0B1311),             // Fundo verde quase preto
+    panel: Color(0xFF131E1A),          // Painéis verde musgo escuro
+    panel2: Color(0xFF1A2823),         // Painéis elevados (Inputs)
+    panelElevated: Color(0xFF22332E),  // Fundo de ícones e botões secundários
+    border: Color(0xFF2E423C),         // Bordas suaves
+    muted: Color(0xFF7A9990),          // Texto secundário
+    fg: Color(0xFFE6F0EC),             // Texto principal branco gelo
+    mint: Color(0xFF2AD492),           // Destaque (Esmeralda equilibrado)
   );
 
-  /// Paleta clara.
+  /// Paleta clara refinada
   static const CosColors light = CosColors(
-    bg: Color(0xFFF3F7F6),
+    bg: Color(0xFFF2F7F5),
     panel: Color(0xFFFFFFFF),
     panel2: Color(0xFFEAF1EF),
     panelElevated: Color(0xFFDDE9E6),
     border: Color(0xFFD6E2DF),
     muted: Color(0xFF566970),
-    fg: Color(0xFF172C30),
-    mint: Color(0xFF00836F),
+    fg: Color(0xFF13211D),
+    mint: Color(0xFF009B6B),           // Destaque verde escuro
   );
 
   static CosColors of(BuildContext context) {

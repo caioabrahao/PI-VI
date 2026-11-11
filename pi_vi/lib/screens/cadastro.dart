@@ -123,7 +123,7 @@ class _CadastroScreenState extends State<CadastroScreen> {
       prefixIcon: icone == null ? null : Icon(icone, color: c.muted, size: 19),
       suffixIcon: sufixo,
       filled: true,
-      fillColor: c.panel,
+      fillColor: c.panel2,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide(color: c.border),

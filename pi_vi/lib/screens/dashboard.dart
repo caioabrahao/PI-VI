@@ -24,7 +24,6 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   List<DispositivoIot> _dispositivos = [];
-
   StreamSubscription<List<DispositivoIot>>? _assinatura;
 
   bool _carregando = true;
@@ -222,7 +221,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
 
     if (confirmar != true || !mounted) return;
-
     setState(() => _saindo = true);
 
     try {
@@ -350,9 +348,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   void _navegarDaSubtela(int novaAba, int abaAtual) {
     if (!mounted || _saindo || novaAba == abaAtual) return;
-
     Navigator.of(context).popUntil((route) => route.isFirst);
-
     if (novaAba != 0) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && !_saindo) _selecionarAba(novaAba);

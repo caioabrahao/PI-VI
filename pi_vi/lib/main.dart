@@ -26,12 +26,12 @@ class COSApp extends StatelessWidget {
   const COSApp({super.key});
 
   ThemeData _darkTheme() {
-    const bg = Color(0xFF080B0F);
-    const primary = Color(0xFF4FE0C0);
-    const surface = Color(0xFF10151B);
-    const text = Color(0xFFF1F5F8);
-    const muted = Color(0xFF8A98A5);
-    const border = Color(0xFF293640);
+    const bg = Color(0xFF0B1311);
+    const primary = Color(0xFF2AD492);
+    const surface = Color(0xFF131E1A);
+    const text = Color(0xFFE6F0EC);
+    const muted = Color(0xFF7A9990);
+    const border = Color(0xFF2E423C);
 
     return ThemeData(
       brightness: Brightness.dark,
@@ -92,17 +92,17 @@ class COSApp extends StatelessWidget {
       ),
       textSelectionTheme: const TextSelectionThemeData(
         cursorColor: primary,
-        selectionColor: Color(0x6655E6C1),
+        selectionColor: Color(0x662AD492),
         selectionHandleColor: primary,
       ),
     );
   }
 
   ThemeData _lightTheme() {
-    const bg = Color(0xFFF3F7F6);
-    const primary = Color(0xFF00836F);
+    const bg = Color(0xFFF2F7F5);
+    const primary = Color(0xFF009B6B);
     const surface = Color(0xFFFFFFFF);
-    const text = Color(0xFF172C30);
+    const text = Color(0xFF13211D);
     const muted = Color(0xFF566970);
     const border = Color(0xFFD6E2DF);
 
@@ -165,7 +165,7 @@ class COSApp extends StatelessWidget {
       ),
       textSelectionTheme: const TextSelectionThemeData(
         cursorColor: primary,
-        selectionColor: Color(0x6600836F),
+        selectionColor: Color(0x66009B6B),
         selectionHandleColor: primary,
       ),
     );

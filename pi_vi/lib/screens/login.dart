@@ -6,6 +6,7 @@ import '../services/firebase_service.dart';
 import '../services/social_auth_service.dart';
 import '../theme.dart';
 import 'dashboard.dart';
+import 'cadastro.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -235,7 +236,7 @@ class _LoginScreenState extends State<LoginScreen> {
       prefixIcon: Icon(icone, color: c.muted),
       suffixIcon: sufixo,
       filled: true,
-      fillColor: c.panel,
+      fillColor: c.panel2, // Cor levemente mais clara que o fundo
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
         borderSide: BorderSide(color: c.border),
@@ -269,78 +270,68 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    // Logo mais minimalista e alinhada à esquerda
                     Row(
                       children: [
                         Container(
-                          width: 66,
-                          height: 66,
+                          width: 54,
+                          height: 54,
                           decoration: BoxDecoration(
                             color: c.mint.withValues(alpha: 0.10),
-                            borderRadius: BorderRadius.circular(20),
+                            borderRadius: BorderRadius.circular(16),
                             border: Border.all(
-                              color: c.mint.withValues(alpha: 0.35),
+                              color: c.mint.withValues(alpha: 0.3),
                             ),
                           ),
                           child: Icon(
                             Icons.home_rounded,
                             color: c.mint,
-                            size: 34,
+                            size: 28,
                           ),
                         ),
                         const SizedBox(width: 16),
-                        Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'COS',
-                              style: TextStyle(
-                                color: c.fg,
-                                fontSize: 34,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 3,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'CASA INTELIGENTE',
-                              style: TextStyle(
-                                color: c.mint,
-                                fontSize: 11,
-                                letterSpacing: 2,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
+                        Text(
+                          'COS',
+                          style: TextStyle(
+                            color: c.fg,
+                            fontSize: 28,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 2,
+                          ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 34),
+                    const SizedBox(height: 42),
+
+                    // Título mais equilibrado
                     Text(
-                      'Bem-vindo de volta!',
+                      'Sua casa, em sintonia.',
                       style: TextStyle(
                         color: c.fg,
-                        fontSize: 25,
+                        fontSize: 32, // Reduzido de 34 para 32
                         fontWeight: FontWeight.w800,
+                        height: 1.2,
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 12),
                     Text(
-                      'Entre na sua conta para controlar sua casa inteligente.',
+                      'Controle ambientes, economize energia e cuide de quem importa.',
                       style: TextStyle(
                         color: c.muted,
-                        fontSize: 13,
+                        fontSize: 14, // Aumentado para melhor leitura
                         height: 1.5,
                       ),
                     ),
-                    const SizedBox(height: 26),
+                    const SizedBox(height: 36),
+
+                    // Inputs
                     TextFormField(
                       controller: _email,
                       enabled: !ocupado,
                       keyboardType: TextInputType.emailAddress,
                       textInputAction: TextInputAction.next,
                       autofillHints: const [AutofillHints.email],
-                      style: TextStyle(color: c.fg),
+                      style: TextStyle(color: c.fg, fontSize: 15),
                       decoration: _campo(
                         c,
                         'E-mail',
@@ -363,7 +354,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       obscureText: !_mostrarSenha,
                       textInputAction: TextInputAction.done,
                       autofillHints: const [AutofillHints.password],
-                      style: TextStyle(color: c.fg),
+                      style: TextStyle(color: c.fg, fontSize: 15),
                       decoration: _campo(
                         c,
                         'Senha',
@@ -393,18 +384,28 @@ class _LoginScreenState extends State<LoginScreen> {
                       },
                       onFieldSubmitted: (_) => _entrarEmail(),
                     ),
-                    const SizedBox(height: 8),
+
+                    // Link "Esqueci minha senha" mais sutil
                     Align(
                       alignment: Alignment.centerRight,
                       child: TextButton(
                         onPressed: ocupado ? null : _recuperarSenha,
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
                         child: Text(
                           'Esqueci minha senha',
-                          style: TextStyle(color: c.mint, fontSize: 12),
+                          style: TextStyle(
+                            color: c.mint,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
                     ),
-                    const SizedBox(height: 18),
+                    const SizedBox(height: 12),
+
+                    // Botão Entrar
                     SizedBox(
                       height: 54,
                       child: ElevatedButton(
@@ -425,21 +426,30 @@ class _LoginScreenState extends State<LoginScreen> {
                                   strokeWidth: 2,
                                 ),
                               )
-                            : const Text(
-                                'Entrar',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 15,
-                                ),
+                            : const Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.arrow_forward_rounded, size: 20),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    'Entrar',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                ],
                               ),
                       ),
                     ),
-                    const SizedBox(height: 27),
+                    const SizedBox(height: 28),
+
+                    // Divisor "ou continue com"
                     Row(
                       children: [
                         Expanded(child: Divider(color: c.border)),
                         Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 14),
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
                           child: Text(
                             'ou continue com',
                             style: TextStyle(color: c.muted, fontSize: 12),
@@ -448,14 +458,16 @@ class _LoginScreenState extends State<LoginScreen> {
                         Expanded(child: Divider(color: c.border)),
                       ],
                     ),
-                    const SizedBox(height: 22),
+                    const SizedBox(height: 24),
+
+                    // Botão Google
                     SizedBox(
                       height: 54,
                       child: OutlinedButton(
                         onPressed: ocupado ? null : _entrarGoogle,
                         style: OutlinedButton.styleFrom(
                           foregroundColor: c.fg,
-                          backgroundColor: c.panel,
+                          backgroundColor: c.panel2,
                           side: BorderSide(color: c.border),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(14),
@@ -479,21 +491,23 @@ class _LoginScreenState extends State<LoginScreen> {
                                     'Entrar com Google',
                                     style: TextStyle(
                                       fontSize: 14,
-                                      fontWeight: FontWeight.w700,
+                                      fontWeight: FontWeight.w600,
                                     ),
                                   ),
                                 ],
                               ),
                       ),
                     ),
-                    const SizedBox(height: 28),
+                    const SizedBox(height: 32),
+
+                    // Footer
                     Wrap(
                       alignment: WrapAlignment.center,
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         Text(
                           'Ainda não tem uma conta?',
-                          style: TextStyle(color: c.muted, fontSize: 12),
+                          style: TextStyle(color: c.muted, fontSize: 13),
                         ),
                         TextButton(
                           onPressed: ocupado ? null : _abrirCadastro,
@@ -501,277 +515,12 @@ class _LoginScreenState extends State<LoginScreen> {
                             'Criar conta',
                             style: TextStyle(
                               color: c.mint,
-                              fontSize: 12,
+                              fontSize: 13,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
                         ),
                       ],
-                    ),
-                    const SizedBox(height: 15),
-                    Text(
-                      'COS  •  CONTROLE DA SUA CASA',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: c.muted,
-                        fontSize: 10,
-                        letterSpacing: 1.2,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class CadastroScreen extends StatefulWidget {
-  const CadastroScreen({super.key});
-
-  @override
-  State<CadastroScreen> createState() => _CadastroScreenState();
-}
-
-class _CadastroScreenState extends State<CadastroScreen> {
-  final _formKey = GlobalKey<FormState>();
-  final _nome = TextEditingController();
-  final _email = TextEditingController();
-  final _senha = TextEditingController();
-  final _confirmacao = TextEditingController();
-
-  bool _salvando = false;
-  bool _mostrarSenha = false;
-
-  @override
-  void dispose() {
-    _nome.dispose();
-    _email.dispose();
-    _senha.dispose();
-    _confirmacao.dispose();
-    super.dispose();
-  }
-
-  Future<void> _cadastrar() async {
-    if (_salvando || !_formKey.currentState!.validate()) return;
-    setState(() => _salvando = true);
-
-    try {
-      await FirebaseService.cadastrar(
-        nome: _nome.text.trim(),
-        email: _email.text.trim(),
-        senha: _senha.text,
-      );
-      await FirebaseService.logout();
-      if (!mounted) return;
-      Navigator.pop(context, true);
-    } catch (erro) {
-      if (!mounted) return;
-      final mensagem = erro is FirebaseAuthException
-          ? (erro.message ?? erro.code)
-          : erro.toString();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(mensagem), backgroundColor: Colors.redAccent),
-      );
-    } finally {
-      if (mounted) setState(() => _salvando = false);
-    }
-  }
-
-  InputDecoration _campo(
-    CosColors c,
-    String titulo,
-    IconData icone, {
-    Widget? sufixo,
-  }) {
-    return InputDecoration(
-      labelText: titulo,
-      labelStyle: TextStyle(color: c.muted),
-      prefixIcon: Icon(icone, color: c.muted),
-      suffixIcon: sufixo,
-      filled: true,
-      fillColor: c.panel,
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
-        borderSide: BorderSide(color: c.border),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
-        borderSide: BorderSide(color: c.border),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
-        borderSide: BorderSide(color: c.mint, width: 1.5),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final c = CosColors.of(context);
-
-    return Scaffold(
-      backgroundColor: c.bg,
-      appBar: AppBar(
-        backgroundColor: c.bg,
-        foregroundColor: c.fg,
-        title: const Text('Criar conta'),
-      ),
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(22),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Icon(
-                      Icons.person_add_alt_1_rounded,
-                      color: c.mint,
-                      size: 48,
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Sua casa começa aqui.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: c.fg,
-                        fontSize: 23,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      'Crie sua conta COS gratuitamente.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: c.muted, fontSize: 13),
-                    ),
-                    const SizedBox(height: 26),
-                    TextFormField(
-                      controller: _nome,
-                      enabled: !_salvando,
-                      textCapitalization: TextCapitalization.words,
-                      style: TextStyle(color: c.fg),
-                      decoration: _campo(
-                        c,
-                        'Nome completo',
-                        Icons.person_outline_rounded,
-                      ),
-                      validator: (valor) {
-                        if (valor == null || valor.trim().length < 2) {
-                          return 'Informe seu nome.';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 15),
-                    TextFormField(
-                      controller: _email,
-                      enabled: !_salvando,
-                      keyboardType: TextInputType.emailAddress,
-                      style: TextStyle(color: c.fg),
-                      decoration: _campo(
-                        c,
-                        'E-mail',
-                        Icons.mail_outline_rounded,
-                      ),
-                      validator: (valor) {
-                        if (valor == null ||
-                            !RegExp(
-                              r'^[^\s@]+@[^\s@]+\.[^\s@]+$',
-                            ).hasMatch(valor.trim())) {
-                          return 'Informe um e-mail válido.';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 15),
-                    TextFormField(
-                      controller: _senha,
-                      enabled: !_salvando,
-                      obscureText: !_mostrarSenha,
-                      style: TextStyle(color: c.fg),
-                      decoration: _campo(
-                        c,
-                        'Senha',
-                        Icons.lock_outline_rounded,
-                        sufixo: IconButton(
-                          onPressed: _salvando
-                              ? null
-                              : () => setState(
-                                  () => _mostrarSenha = !_mostrarSenha,
-                                ),
-                          icon: Icon(
-                            _mostrarSenha
-                                ? Icons.visibility_off_outlined
-                                : Icons.visibility_outlined,
-                            color: c.muted,
-                          ),
-                        ),
-                      ),
-                      validator: (valor) {
-                        if (valor == null || valor.length < 6) {
-                          return 'Use pelo menos 6 caracteres.';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 15),
-                    TextFormField(
-                      controller: _confirmacao,
-                      enabled: !_salvando,
-                      obscureText: !_mostrarSenha,
-                      style: TextStyle(color: c.fg),
-                      decoration: _campo(
-                        c,
-                        'Confirmar senha',
-                        Icons.verified_user_outlined,
-                      ),
-                      validator: (valor) {
-                        if (valor != _senha.text) {
-                          return 'As senhas não coincidem.';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 24),
-                    SizedBox(
-                      height: 54,
-                      child: ElevatedButton(
-                        onPressed: _salvando ? null : _cadastrar,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: c.mint,
-                          foregroundColor: c.bg,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                        ),
-                        child: _salvando
-                            ? SizedBox(
-                                width: 22,
-                                height: 22,
-                                child: CircularProgressIndicator(
-                                  color: c.bg,
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Text(
-                                'Criar minha conta',
-                                style: TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Após o cadastro, verifique seu e-mail para entrar no COS.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: c.muted, fontSize: 12),
                     ),
                   ],
                 ),
@@ -792,7 +541,7 @@ class _GoogleLogo extends StatelessWidget {
     return const FaIcon(
       FontAwesomeIcons.google,
       color: Color(0xFF4285F4),
-      size: 22,
+      size: 20,
     );
   }
 }

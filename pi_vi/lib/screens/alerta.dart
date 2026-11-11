@@ -6,7 +6,7 @@ import '../widgets/cos_app_navigation.dart';
 
 const _red = Color(0xFFFF6077);
 const _amber = Color(0xFFFFC64D);
-const _blue = Color(0xFF65B7FF);
+const _blue = Color(0xFF3DB8C9); // Azul atualizado para o novo padrão
 
 enum _Filtro { todas, criticas, dispositivos, energia }
 

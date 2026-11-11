@@ -6,10 +6,6 @@ import 'package:flutter/material.dart';
 import '../theme.dart';
 import '../widgets/cos_app_navigation.dart';
 
-// =====================================================
-// MODELOS
-// =====================================================
-
 enum AutomacaoDeviceType { lampada, tomada, hub }
 
 class AutomacaoDevice {
@@ -184,10 +180,6 @@ class AutomacaoData {
     return accumulatedKwh + watts * elapsedSeconds / 3600000;
   }
 }
-
-// =====================================================
-// TELA
-// =====================================================
 
 class AutomacaoScreen extends StatefulWidget {
   final AutomacaoData data;
@@ -1213,7 +1205,7 @@ class _AutomacaoScreenState extends State<AutomacaoScreen> {
                 value: '3,1 / 8 GB',
                 detail: '38% em uso',
                 fraction: 0.38,
-                color: const Color(0xFF69B5FF),
+                color: const Color(0xFF3DB8C9), // Azul atualizado
               ),
               const SizedBox(height: 10),
               _HubResourceRow(
@@ -1253,7 +1245,7 @@ class _AutomacaoScreenState extends State<AutomacaoScreen> {
                       label: 'TRÁFEGO',
                       value: '18,4',
                       unit: ' MB/s',
-                      valueColor: const Color(0xFF69B5FF),
+                      valueColor: const Color(0xFF3DB8C9), // Azul atualizado
                     ),
                   ),
                 ],
@@ -1478,16 +1470,12 @@ class _AutomacaoScreenState extends State<AutomacaoScreen> {
   }
 }
 
-// =====================================================
-// PALETA E WIDGETS AUXILIARES
-// =====================================================
-
 const _palette = [
   Color(0xFFFF5C5C),
   Color(0xFFFF984F),
   Color(0xFFFFD15C),
   Color(0xFF4FE0C0),
-  Color(0xFF57B7FF),
+  Color(0xFF7EC8FF), // Azul atualizado
   Color(0xFF9C75FF),
   Color(0xFFE66BEB),
 ];
