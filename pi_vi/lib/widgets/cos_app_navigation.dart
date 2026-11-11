@@ -1,12 +1,6 @@
 import 'package:flutter/material.dart';
 
-const Color cosBackground = Color(0xFF080B0F);
-const Color cosPanel = Color(0xFF10151B);
-const Color cosPanelElevated = Color(0xFF171E26);
-const Color cosBorder = Color(0xFF293640);
-const Color cosMuted = Color(0xFF8A98A5);
-const Color cosForeground = Color(0xFFF1F5F8);
-const Color cosMint = Color(0xFF4FE0C0);
+import '../theme.dart';
 
 class CosAppHeader extends StatelessWidget {
   final String title;
@@ -22,17 +16,19 @@ class CosAppHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = CosColors.of(context);
+
     return Row(
       children: [
         Container(
           width: 44,
           height: 44,
           decoration: BoxDecoration(
-            color: cosMint.withValues(alpha: 0.12),
+            color: c.mint.withValues(alpha: 0.12),
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: cosMint.withValues(alpha: 0.25)),
+            border: Border.all(color: c.mint.withValues(alpha: 0.25)),
           ),
-          child: const Icon(Icons.home_rounded, color: cosMint, size: 25),
+          child: Icon(Icons.home_rounded, color: c.mint, size: 25),
         ),
         const SizedBox(width: 12),
         Expanded(
@@ -41,10 +37,10 @@ class CosAppHeader extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  const Text(
+                  Text(
                     'COS',
                     style: TextStyle(
-                      color: cosForeground,
+                      color: c.fg,
                       fontSize: 14,
                       fontWeight: FontWeight.w900,
                       letterSpacing: 1.2,
@@ -56,8 +52,8 @@ class CosAppHeader extends StatelessWidget {
                       title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: cosForeground,
+                      style: TextStyle(
+                        color: c.fg,
                         fontSize: 18,
                         fontWeight: FontWeight.w800,
                       ),
@@ -70,7 +66,7 @@ class CosAppHeader extends StatelessWidget {
                 subtitle,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: cosMuted, fontSize: 11),
+                style: TextStyle(color: c.muted, fontSize: 11),
               ),
             ],
           ),
@@ -101,10 +97,12 @@ class CosAppNavigation extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = CosColors.of(context);
+
     return Container(
-      decoration: const BoxDecoration(
-        color: cosPanel,
-        border: Border(top: BorderSide(color: cosBorder)),
+      decoration: BoxDecoration(
+        color: c.panel,
+        border: Border(top: BorderSide(color: c.border)),
       ),
       child: SafeArea(
         top: false,
@@ -144,28 +142,28 @@ class _NavigationItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = CosColors.of(context);
+
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(13),
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 2),
         decoration: BoxDecoration(
-          color: selected
-              ? cosMint.withValues(alpha: 0.13)
-              : Colors.transparent,
+          color: selected ? c.mint.withValues(alpha: 0.13) : Colors.transparent,
           borderRadius: BorderRadius.circular(13),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: selected ? cosMint : cosMuted, size: 19),
+            Icon(icon, color: selected ? c.mint : c.muted, size: 19),
             const SizedBox(height: 4),
             Text(
               label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                color: selected ? cosMint : cosMuted,
+                color: selected ? c.mint : c.muted,
                 fontSize: 9,
                 fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
               ),

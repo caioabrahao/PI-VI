@@ -1,6 +1,6 @@
-
 import 'package:flutter/material.dart';
 
+import '../theme.dart';
 import 'login.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -11,7 +11,6 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
-
   @override
   void initState() {
     super.initState();
@@ -19,45 +18,28 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _abrirLogin() async {
-
-    await Future.delayed(
-      const Duration(seconds: 2),
-    );
+    await Future.delayed(const Duration(seconds: 2));
 
     if (!mounted) return;
 
     Navigator.of(context).pushReplacement(
-      MaterialPageRoute(
-        builder: (context) => const LoginScreen(),
-      ),
+      MaterialPageRoute(builder: (context) => const LoginScreen()),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final c = CosColors.of(context);
 
     return Scaffold(
-      backgroundColor: const Color(0xFF080B0F),
-
+      backgroundColor: c.bg,
       body: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
-
           children: [
-
-            const Icon(
-              Icons.hub,
-              size: 160,
-              color: Color(0xFF4FE0C0),
-            ),
-
+            Icon(Icons.hub, size: 160, color: c.mint),
             const SizedBox(height: 32),
-
-            const CircularProgressIndicator(
-              color: Color(0xFF4FE0C0),
-              strokeWidth: 3,
-            ),
-
+            CircularProgressIndicator(color: c.mint, strokeWidth: 3),
           ],
         ),
       ),

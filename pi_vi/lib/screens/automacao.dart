@@ -3,7 +3,12 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../theme.dart';
 import '../widgets/cos_app_navigation.dart';
+
+// =====================================================
+// MODELOS
+// =====================================================
 
 enum AutomacaoDeviceType { lampada, tomada, hub }
 
@@ -25,6 +30,37 @@ class AutomacaoDevice {
   });
 }
 
+class ConsumoRegistro {
+  final DateTime data;
+  final String deviceId;
+  final String deviceName;
+  final double totalKwh;
+
+  const ConsumoRegistro({
+    required this.data,
+    required this.deviceId,
+    required this.deviceName,
+    required this.totalKwh,
+  });
+}
+
+class _AutomacaoDeviceState {
+  bool isOn;
+  double brightness = 0.78;
+  double temperature = 3000;
+  Color color = CosColors.dark.mint;
+  double registeredKwh = 0;
+  DateTime? poweredOnAt;
+  DateTime? timerEndsAt;
+  bool weeklyScheduleEnabled = true;
+  final Set<int> scheduleDays = {1, 2, 3, 4, 5};
+
+  _AutomacaoDeviceState({required this.isOn}) {
+    if (isOn) poweredOnAt = DateTime.now();
+    if (isOn) timerEndsAt = DateTime.now().add(const Duration(minutes: 45));
+  }
+}
+
 class AutomacaoData {
   final Map<String, _AutomacaoDeviceState> _states = {};
   final List<ConsumoRegistro> registros = [];
@@ -37,7 +73,6 @@ class AutomacaoData {
   }
 
   bool isOn(AutomacaoDevice device) => _stateFor(device).isOn;
-
   double brightness(AutomacaoDevice device) => _stateFor(device).brightness;
   double temperature(AutomacaoDevice device) => _stateFor(device).temperature;
   Color color(AutomacaoDevice device) => _stateFor(device).color;
@@ -150,36 +185,9 @@ class AutomacaoData {
   }
 }
 
-class ConsumoRegistro {
-  final DateTime data;
-  final String deviceId;
-  final String deviceName;
-  final double totalKwh;
-
-  const ConsumoRegistro({
-    required this.data,
-    required this.deviceId,
-    required this.deviceName,
-    required this.totalKwh,
-  });
-}
-
-class _AutomacaoDeviceState {
-  bool isOn;
-  double brightness = 0.78;
-  double temperature = 3000;
-  Color color = cosMint;
-  double registeredKwh = 0;
-  DateTime? poweredOnAt;
-  DateTime? timerEndsAt;
-  bool weeklyScheduleEnabled = true;
-  final Set<int> scheduleDays = {1, 2, 3, 4, 5};
-
-  _AutomacaoDeviceState({required this.isOn}) {
-    if (isOn) poweredOnAt = DateTime.now();
-    if (isOn) timerEndsAt = DateTime.now().add(const Duration(minutes: 45));
-  }
-}
+// =====================================================
+// TELA
+// =====================================================
 
 class AutomacaoScreen extends StatefulWidget {
   final AutomacaoData data;
@@ -290,6 +298,8 @@ class _AutomacaoScreenState extends State<AutomacaoScreen> {
     return iterator.moveNext() ? iterator.current.id : null;
   }
 
+  late final Timer _deviceTimer;
+
   @override
   void initState() {
     super.initState();
@@ -302,8 +312,6 @@ class _AutomacaoScreenState extends State<AutomacaoScreen> {
       (_) => _checkPlugTimer(),
     );
   }
-
-  late final Timer _deviceTimer;
 
   @override
   void dispose() {
@@ -390,12 +398,14 @@ class _AutomacaoScreenState extends State<AutomacaoScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final c = CosColors.of(context);
     final selectedDevice = _categories.firstWhere(
       (device) => device.type == _selected,
     );
     final registeredDevice = _selectedDevice;
+
     return Scaffold(
-      backgroundColor: cosBackground,
+      backgroundColor: c.bg,
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
@@ -424,6 +434,7 @@ class _AutomacaoScreenState extends State<AutomacaoScreen> {
                           itemBuilder: (context, index) {
                             final device = _categories[index];
                             return _DeviceSelectorCard(
+                              c: c,
                               device: device,
                               selected: _selected == device.type,
                               online:
@@ -436,14 +447,14 @@ class _AutomacaoScreenState extends State<AutomacaoScreen> {
                       ),
                       const SizedBox(height: 16),
                       if (_selected != AutomacaoDeviceType.hub)
-                        _buildRegisteredDeviceSelector(),
+                        _buildRegisteredDeviceSelector(c),
                       Row(
                         children: [
                           Expanded(
                             child: Text(
                               registeredDevice?.name ?? selectedDevice.subtitle,
-                              style: const TextStyle(
-                                color: cosForeground,
+                              style: TextStyle(
+                                color: c.fg,
                                 fontSize: 17,
                                 fontWeight: FontWeight.w800,
                               ),
@@ -453,8 +464,8 @@ class _AutomacaoScreenState extends State<AutomacaoScreen> {
                             _deviceStatus(registeredDevice),
                             style: TextStyle(
                               color: registeredDevice?.online == true
-                                  ? cosMint
-                                  : cosMuted,
+                                  ? c.mint
+                                  : c.muted,
                               fontSize: 10,
                             ),
                           ),
@@ -462,17 +473,17 @@ class _AutomacaoScreenState extends State<AutomacaoScreen> {
                       ),
                       const SizedBox(height: 12),
                       if (_selected == AutomacaoDeviceType.hub)
-                        _buildHubControls()
+                        _buildHubControls(c)
                       else if (registeredDevice == null)
-                        _buildNoRegisteredDevice()
+                        _buildNoRegisteredDevice(c)
                       else if (_selected == AutomacaoDeviceType.lampada)
-                        _buildLampControls()
+                        _buildLampControls(c)
                       else
-                        _buildPlugControls(registeredDevice),
+                        _buildPlugControls(c, registeredDevice),
                       if (registeredDevice != null &&
                           _selected != AutomacaoDeviceType.hub) ...[
                         const SizedBox(height: 14),
-                        _buildConsumptionCard(registeredDevice),
+                        _buildConsumptionCard(c, registeredDevice),
                       ],
                     ]),
                   ),
@@ -495,7 +506,7 @@ class _AutomacaoScreenState extends State<AutomacaoScreen> {
     return '${device.location} · ${device.online ? 'online' : 'offline'}';
   }
 
-  Widget _buildRegisteredDeviceSelector() {
+  Widget _buildRegisteredDeviceSelector(CosColors c) {
     final devices = _categoryDevices;
     if (devices.isEmpty) return const SizedBox.shrink();
     return SizedBox(
@@ -526,13 +537,13 @@ class _AutomacaoScreenState extends State<AutomacaoScreen> {
               size: 15,
             ),
             labelStyle: TextStyle(
-              color: selected ? cosMint : cosForeground,
+              color: selected ? c.mint : c.fg,
               fontSize: 10,
               fontWeight: FontWeight.w700,
             ),
-            backgroundColor: cosPanel,
-            selectedColor: const Color(0xFF163B37),
-            side: BorderSide(color: selected ? cosMint : cosBorder),
+            backgroundColor: c.panel,
+            selectedColor: c.mint.withValues(alpha: 0.18),
+            side: BorderSide(color: selected ? c.mint : c.border),
             showCheckmark: false,
             padding: const EdgeInsets.symmetric(horizontal: 8),
           );
@@ -541,7 +552,7 @@ class _AutomacaoScreenState extends State<AutomacaoScreen> {
     );
   }
 
-  Widget _buildNoRegisteredDevice() {
+  Widget _buildNoRegisteredDevice(CosColors c) {
     final label = _selected == AutomacaoDeviceType.lampada
         ? 'lâmpadas'
         : 'dispositivos conectados a uma tomada smart';
@@ -549,19 +560,19 @@ class _AutomacaoScreenState extends State<AutomacaoScreen> {
       width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: cosPanel,
+        color: c.panel,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: cosBorder),
+        border: Border.all(color: c.border),
       ),
       child: Text(
         'Nenhum dispositivo cadastrado em $label. Adicione um pela tela '
         'Dispositivos para configurar aqui.',
-        style: const TextStyle(color: cosMuted, fontSize: 12, height: 1.5),
+        style: TextStyle(color: c.muted, fontSize: 12, height: 1.5),
       ),
     );
   }
 
-  Widget _buildLampControls() {
+  Widget _buildLampControls(CosColors c) {
     final device = _selectedDevice!;
     final color = widget.data.color(device);
     final brightness = widget.data.brightness(device);
@@ -571,6 +582,7 @@ class _AutomacaoScreenState extends State<AutomacaoScreen> {
         : temperature > 5000
         ? 'Fria'
         : 'Neutra';
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -585,11 +597,9 @@ class _AutomacaoScreenState extends State<AutomacaoScreen> {
                   height: 146,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: _lampOn ? color.withValues(alpha: 0.08) : cosPanel,
+                    color: _lampOn ? color.withValues(alpha: 0.08) : c.panel,
                     border: Border.all(
-                      color: _lampOn
-                          ? color.withValues(alpha: 0.55)
-                          : cosBorder,
+                      color: _lampOn ? color.withValues(alpha: 0.55) : c.border,
                     ),
                     boxShadow: _lampOn
                         ? [
@@ -605,12 +615,12 @@ class _AutomacaoScreenState extends State<AutomacaoScreen> {
                       width: 90,
                       height: 90,
                       decoration: BoxDecoration(
-                        color: _lampOn ? color : cosPanelElevated,
+                        color: _lampOn ? color : c.panelElevated,
                         shape: BoxShape.circle,
                       ),
                       child: Icon(
                         Icons.power_settings_new_rounded,
-                        color: _lampOn ? cosBackground : cosMuted,
+                        color: _lampOn ? c.bg : c.muted,
                         size: 38,
                       ),
                     ),
@@ -623,8 +633,8 @@ class _AutomacaoScreenState extends State<AutomacaoScreen> {
                 children: [
                   Text(
                     _lampOn ? 'Ligada' : 'Desligada',
-                    style: const TextStyle(
-                      color: cosForeground,
+                    style: TextStyle(
+                      color: c.fg,
                       fontSize: 15,
                       fontWeight: FontWeight.w700,
                     ),
@@ -634,8 +644,8 @@ class _AutomacaoScreenState extends State<AutomacaoScreen> {
                     value: _lampOn,
                     onChanged: (value) =>
                         _setPower(AutomacaoDeviceType.lampada, value),
-                    activeThumbColor: cosMint,
-                    activeTrackColor: cosMint.withValues(alpha: 0.4),
+                    activeThumbColor: c.mint,
+                    activeTrackColor: c.mint.withValues(alpha: 0.4),
                   ),
                 ],
               ),
@@ -646,17 +656,18 @@ class _AutomacaoScreenState extends State<AutomacaoScreen> {
         Container(
           padding: const EdgeInsets.fromLTRB(14, 10, 14, 11),
           decoration: BoxDecoration(
-            color: cosPanel,
+            color: c.panel,
             borderRadius: BorderRadius.circular(15),
-            border: Border.all(color: cosBorder),
+            border: Border.all(color: c.border),
           ),
           child: Column(
             children: [
               _SliderLine(
+                c: c,
                 title: 'Brilho',
                 valueLabel: '${(brightness * 100).round()}%',
                 value: brightness,
-                activeColor: cosMint,
+                activeColor: c.mint,
                 onChanged: (value) => setState(() {
                   widget.data.setBrightness(device, value);
                   _activeScene = null;
@@ -664,6 +675,7 @@ class _AutomacaoScreenState extends State<AutomacaoScreen> {
               ),
               const SizedBox(height: 7),
               _SliderLine(
+                c: c,
                 title: 'Temperatura',
                 valueLabel: '${temperature.round()} K · $temperatureLabel',
                 value: (temperature - 2200) / 4300,
@@ -679,18 +691,15 @@ class _AutomacaoScreenState extends State<AutomacaoScreen> {
         const SizedBox(height: 13),
         Row(
           children: [
-            const Expanded(
+            Expanded(
               child: Text(
                 'Cor',
-                style: TextStyle(
-                  color: cosForeground,
-                  fontWeight: FontWeight.w800,
-                ),
+                style: TextStyle(color: c.fg, fontWeight: FontWeight.w800),
               ),
             ),
             TextButton(
               onPressed: _openColorWheel,
-              style: TextButton.styleFrom(foregroundColor: cosMint),
+              style: TextButton.styleFrom(foregroundColor: c.mint),
               child: const Text('Personalizar'),
             ),
           ],
@@ -713,18 +722,15 @@ class _AutomacaoScreenState extends State<AutomacaoScreen> {
         const SizedBox(height: 8),
         Row(
           children: [
-            const Expanded(
+            Expanded(
               child: Text(
                 'Cenas',
-                style: TextStyle(
-                  color: cosForeground,
-                  fontWeight: FontWeight.w800,
-                ),
+                style: TextStyle(color: c.fg, fontWeight: FontWeight.w800),
               ),
             ),
             Text(
               _activeScene?.name ?? 'Toque para aplicar',
-              style: const TextStyle(color: cosMint, fontSize: 10),
+              style: TextStyle(color: c.mint, fontSize: 10),
             ),
           ],
         ),
@@ -738,6 +744,7 @@ class _AutomacaoScreenState extends State<AutomacaoScreen> {
             itemBuilder: (context, index) {
               final scene = _scenes[index];
               return _SceneCard(
+                c: c,
                 scene: scene,
                 selected: _activeScene == scene,
                 onTap: () => _applyScene(scene),
@@ -749,10 +756,11 @@ class _AutomacaoScreenState extends State<AutomacaoScreen> {
     );
   }
 
-  Widget _buildPlugControls(AutomacaoDevice device) {
+  Widget _buildPlugControls(CosColors c, AutomacaoDevice device) {
     final endsAt = widget.data.timerEndsAt(device);
     final minutesLeft = endsAt?.difference(DateTime.now()).inMinutes;
     final days = widget.data.scheduleDays(device);
+
     final scheduledDays = !widget.data.weeklyScheduleEnabled(device)
         ? 'Agenda desativada'
         : days.isEmpty
@@ -781,10 +789,10 @@ class _AutomacaoScreenState extends State<AutomacaoScreen> {
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: _plugOn ? const Color(0xFF163B37) : cosPanel,
+            color: _plugOn ? c.mint.withValues(alpha: 0.14) : c.panel,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: _plugOn ? cosMint.withValues(alpha: 0.4) : cosBorder,
+              color: _plugOn ? c.mint.withValues(alpha: 0.4) : c.border,
             ),
           ),
           child: Row(
@@ -793,12 +801,12 @@ class _AutomacaoScreenState extends State<AutomacaoScreen> {
                 width: 58,
                 height: 58,
                 decoration: BoxDecoration(
-                  color: _plugOn ? cosMint : cosPanelElevated,
+                  color: _plugOn ? c.mint : c.panelElevated,
                   borderRadius: BorderRadius.circular(15),
                 ),
                 child: Icon(
                   Icons.power_outlined,
-                  color: _plugOn ? cosBackground : cosMuted,
+                  color: _plugOn ? c.bg : c.muted,
                   size: 29,
                 ),
               ),
@@ -809,8 +817,8 @@ class _AutomacaoScreenState extends State<AutomacaoScreen> {
                   children: [
                     Text(
                       _plugOn ? 'Energia ligada' : 'Energia desligada',
-                      style: const TextStyle(
-                        color: cosForeground,
+                      style: TextStyle(
+                        color: c.fg,
                         fontSize: 15,
                         fontWeight: FontWeight.w800,
                       ),
@@ -818,13 +826,13 @@ class _AutomacaoScreenState extends State<AutomacaoScreen> {
                     const SizedBox(height: 3),
                     Text(
                       _plugOn ? 'Ativa há 2 h 18 min' : 'Tomada em espera',
-                      style: const TextStyle(color: cosMuted, fontSize: 10),
+                      style: TextStyle(color: c.muted, fontSize: 10),
                     ),
                     const SizedBox(height: 7),
                     Text(
                       _plugOn ? 'PROTEÇÃO ATIVA' : 'PROTEÇÃO EM ESPERA',
-                      style: const TextStyle(
-                        color: cosMint,
+                      style: TextStyle(
+                        color: c.mint,
                         fontSize: 9,
                         fontWeight: FontWeight.w700,
                       ),
@@ -836,28 +844,28 @@ class _AutomacaoScreenState extends State<AutomacaoScreen> {
                 value: _plugOn,
                 onChanged: (value) =>
                     _setPower(AutomacaoDeviceType.tomada, value),
-                activeThumbColor: cosMint,
-                activeTrackColor: cosMint.withValues(alpha: 0.4),
+                activeThumbColor: c.mint,
+                activeTrackColor: c.mint.withValues(alpha: 0.4),
               ),
             ],
           ),
         ),
         const SizedBox(height: 12),
-        const Row(
+        Row(
           children: [
-            Expanded(
+            const Expanded(
               child: _PlugMetricCard(
                 label: 'POTÊNCIA AGORA',
                 value: '42',
                 unit: 'W',
               ),
             ),
-            SizedBox(width: 8),
-            Expanded(
+            const SizedBox(width: 8),
+            const Expanded(
               child: _PlugMetricCard(label: 'TENSÃO', value: '221', unit: 'V'),
             ),
-            SizedBox(width: 8),
-            Expanded(
+            const SizedBox(width: 8),
+            const Expanded(
               child: _PlugMetricCard(
                 label: 'CORRENTE',
                 value: '0,19',
@@ -870,20 +878,20 @@ class _AutomacaoScreenState extends State<AutomacaoScreen> {
         Container(
           padding: const EdgeInsets.fromLTRB(14, 13, 14, 11),
           decoration: BoxDecoration(
-            color: cosPanel,
+            color: c.panel,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: cosBorder),
+            border: Border.all(color: c.border),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
-                  const Expanded(
+                  Expanded(
                     child: Text(
                       'Consumo hoje',
                       style: TextStyle(
-                        color: cosForeground,
+                        color: c.fg,
                         fontSize: 14,
                         fontWeight: FontWeight.w800,
                       ),
@@ -892,7 +900,7 @@ class _AutomacaoScreenState extends State<AutomacaoScreen> {
                   Text(
                     'Últimos 7 dias',
                     style: TextStyle(
-                      color: cosMint,
+                      color: c.mint,
                       fontSize: 10,
                       fontWeight: FontWeight.w700,
                     ),
@@ -900,7 +908,7 @@ class _AutomacaoScreenState extends State<AutomacaoScreen> {
                 ],
               ),
               const SizedBox(height: 12),
-              const Row(
+              Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Expanded(
@@ -909,23 +917,23 @@ class _AutomacaoScreenState extends State<AutomacaoScreen> {
                       children: [
                         Text(
                           'ENERGIA',
-                          style: TextStyle(color: cosMuted, fontSize: 9),
+                          style: TextStyle(color: c.muted, fontSize: 9),
                         ),
-                        SizedBox(height: 3),
+                        const SizedBox(height: 3),
                         Text.rich(
                           TextSpan(
                             children: [
                               TextSpan(
                                 text: '0,36',
                                 style: TextStyle(
-                                  color: cosMint,
+                                  color: c.mint,
                                   fontSize: 20,
                                   fontWeight: FontWeight.w800,
                                 ),
                               ),
                               TextSpan(
                                 text: ' kWh',
-                                style: TextStyle(color: cosMuted, fontSize: 10),
+                                style: TextStyle(color: c.muted, fontSize: 10),
                               ),
                             ],
                           ),
@@ -935,20 +943,20 @@ class _AutomacaoScreenState extends State<AutomacaoScreen> {
                   ),
                   Text(
                     '≈ R\$ 0,34',
-                    style: TextStyle(color: cosMuted, fontSize: 10),
+                    style: TextStyle(color: c.muted, fontSize: 10),
                   ),
                 ],
               ),
               const SizedBox(height: 16),
-              const _WeeklyConsumptionChart(),
+              _WeeklyConsumptionChart(c: c),
             ],
           ),
         ),
         const SizedBox(height: 14),
-        const Text(
+        Text(
           'Programação',
           style: TextStyle(
-            color: cosForeground,
+            color: c.fg,
             fontSize: 14,
             fontWeight: FontWeight.w800,
           ),
@@ -956,13 +964,14 @@ class _AutomacaoScreenState extends State<AutomacaoScreen> {
         const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
-            color: cosPanel,
+            color: c.panel,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: cosBorder),
+            border: Border.all(color: c.border),
           ),
           child: Column(
             children: [
               _PlugScheduleRow(
+                c: c,
                 icon: Icons.timer_outlined,
                 title: 'Temporizador',
                 subtitle: minutesLeft == null
@@ -972,7 +981,7 @@ class _AutomacaoScreenState extends State<AutomacaoScreen> {
                   endsAt == null
                       ? Icons.play_circle_outline
                       : Icons.pause_circle_outline,
-                  color: cosMuted,
+                  color: c.muted,
                   size: 20,
                 ),
                 onTap: () => setState(() {
@@ -984,16 +993,13 @@ class _AutomacaoScreenState extends State<AutomacaoScreen> {
                   );
                 }),
               ),
-              const Divider(color: cosBorder, height: 1, indent: 58),
+              Divider(color: c.border, height: 1, indent: 58),
               _PlugScheduleRow(
+                c: c,
                 icon: Icons.calendar_month_outlined,
                 title: 'Agenda semanal',
                 subtitle: '$scheduledDays · 18:00 até 23:30',
-                trailing: const Icon(
-                  Icons.chevron_right,
-                  color: cosMuted,
-                  size: 20,
-                ),
+                trailing: Icon(Icons.chevron_right, color: c.muted, size: 20),
                 onTap: () => _editWeeklySchedule(device),
               ),
             ],
@@ -1009,9 +1015,9 @@ class _AutomacaoScreenState extends State<AutomacaoScreen> {
                 icon: const Icon(Icons.add, size: 17),
                 label: const Text('+ 15 min'),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: cosForeground,
-                  backgroundColor: cosPanel,
-                  side: BorderSide(color: cosBorder),
+                  foregroundColor: c.fg,
+                  backgroundColor: c.panel,
+                  side: BorderSide(color: c.border),
                   minimumSize: const Size.fromHeight(48),
                 ),
               ),
@@ -1023,8 +1029,8 @@ class _AutomacaoScreenState extends State<AutomacaoScreen> {
                 icon: const Icon(Icons.power_settings_new_rounded, size: 18),
                 label: const Text('Desligar agora'),
                 style: FilledButton.styleFrom(
-                  backgroundColor: cosMint,
-                  foregroundColor: cosBackground,
+                  backgroundColor: c.mint,
+                  foregroundColor: c.bg,
                   minimumSize: const Size.fromHeight(48),
                   textStyle: const TextStyle(
                     fontWeight: FontWeight.w800,
@@ -1036,30 +1042,29 @@ class _AutomacaoScreenState extends State<AutomacaoScreen> {
           ],
         ),
         const SizedBox(height: 6),
-        const Text(
+        Text(
           'Valores de potência e consumo exibidos como demonstração; sem medição real da tomada.',
-          style: TextStyle(color: cosMuted, fontSize: 9),
+          style: TextStyle(color: c.muted, fontSize: 9),
         ),
       ],
     );
   }
 
   Future<void> _editWeeklySchedule(AutomacaoDevice device) async {
+    final c = CosColors.of(context);
+
     await showDialog<void>(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          backgroundColor: cosPanel,
+          backgroundColor: c.panel,
           title: const Text('Agenda semanal'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Align(
+              Align(
                 alignment: Alignment.centerLeft,
-                child: Text(
-                  'Ativar tomada',
-                  style: TextStyle(color: cosForeground),
-                ),
+                child: Text('Ativar tomada', style: TextStyle(color: c.fg)),
               ),
               Switch.adaptive(
                 value: widget.data.weeklyScheduleEnabled(device),
@@ -1069,13 +1074,13 @@ class _AutomacaoScreenState extends State<AutomacaoScreen> {
                   );
                   setState(() {});
                 },
-                activeThumbColor: cosMint,
+                activeThumbColor: c.mint,
               ),
-              const Align(
+              Align(
                 alignment: Alignment.centerLeft,
                 child: Text(
                   'Dias da semana',
-                  style: TextStyle(color: cosMuted, fontSize: 11),
+                  style: TextStyle(color: c.muted, fontSize: 11),
                 ),
               ),
               Wrap(
@@ -1097,9 +1102,9 @@ class _AutomacaoScreenState extends State<AutomacaoScreen> {
                 ],
               ),
               const SizedBox(height: 8),
-              const Text(
+              Text(
                 'Horário: 18:00 até 23:30',
-                style: TextStyle(color: cosMuted, fontSize: 11),
+                style: TextStyle(color: c.muted, fontSize: 11),
               ),
             ],
           ),
@@ -1114,16 +1119,16 @@ class _AutomacaoScreenState extends State<AutomacaoScreen> {
     );
   }
 
-  Widget _buildHubControls() {
+  Widget _buildHubControls(CosColors c) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: const Color(0xFF163B37),
+            color: c.mint.withValues(alpha: 0.14),
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: cosMint.withValues(alpha: 0.4)),
+            border: Border.all(color: c.mint.withValues(alpha: 0.4)),
           ),
           child: Row(
             children: [
@@ -1131,38 +1136,34 @@ class _AutomacaoScreenState extends State<AutomacaoScreen> {
                 width: 54,
                 height: 54,
                 decoration: BoxDecoration(
-                  color: cosMint,
+                  color: c.mint,
                   borderRadius: BorderRadius.circular(14),
                 ),
-                child: const Icon(
-                  Icons.memory_rounded,
-                  color: cosBackground,
-                  size: 28,
-                ),
+                child: Icon(Icons.memory_rounded, color: c.bg, size: 28),
               ),
               const SizedBox(width: 12),
-              const Expanded(
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       'cos-hub.local',
                       style: TextStyle(
-                        color: cosForeground,
+                        color: c.fg,
                         fontSize: 15,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
-                    SizedBox(height: 3),
+                    const SizedBox(height: 3),
                     Text(
                       'Debian 12 · kernel 6.6.31',
-                      style: TextStyle(color: cosMuted, fontSize: 9),
+                      style: TextStyle(color: c.muted, fontSize: 9),
                     ),
-                    SizedBox(height: 7),
+                    const SizedBox(height: 7),
                     Text(
                       'ONLINE · 18 DIAS',
                       style: TextStyle(
-                        color: cosMint,
+                        color: c.mint,
                         fontSize: 9,
                         fontWeight: FontWeight.w800,
                       ),
@@ -1183,6 +1184,7 @@ class _AutomacaoScreenState extends State<AutomacaoScreen> {
         ),
         const SizedBox(height: 15),
         _HubSectionTitle(
+          c: c,
           title: 'Recursos do sistema',
           trailing: 'Atualizado agora',
         ),
@@ -1190,54 +1192,57 @@ class _AutomacaoScreenState extends State<AutomacaoScreen> {
         Container(
           padding: const EdgeInsets.all(11),
           decoration: BoxDecoration(
-            color: cosPanel,
+            color: c.panel,
             borderRadius: BorderRadius.circular(15),
-            border: Border.all(color: cosBorder),
+            border: Border.all(color: c.border),
           ),
-          child: const Column(
+          child: Column(
             children: [
               _HubResourceRow(
+                c: c,
                 label: 'CPU',
                 value: '24%',
                 detail: '4 núcleos · 2,4 GHz',
                 fraction: 0.24,
-                color: cosMint,
+                color: c.mint,
               ),
-              SizedBox(height: 10),
+              const SizedBox(height: 10),
               _HubResourceRow(
+                c: c,
                 label: 'Memória',
                 value: '3,1 / 8 GB',
                 detail: '38% em uso',
                 fraction: 0.38,
-                color: Color(0xFF69B5FF),
+                color: const Color(0xFF69B5FF),
               ),
-              SizedBox(height: 10),
+              const SizedBox(height: 10),
               _HubResourceRow(
+                c: c,
                 label: 'Armazenamento',
                 value: '41 / 128 GB',
                 detail: 'SSD · 32% em uso',
                 fraction: 0.32,
-                color: Color(0xFFFFC45C),
+                color: const Color(0xFFFFC45C),
               ),
             ],
           ),
         ),
         const SizedBox(height: 15),
-        const _HubSectionTitle(title: 'Rede'),
+        _HubSectionTitle(c: c, title: 'Rede'),
         const SizedBox(height: 8),
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: cosPanel,
+            color: c.panel,
             borderRadius: BorderRadius.circular(15),
-            border: Border.all(color: cosBorder),
+            border: Border.all(color: c.border),
           ),
-          child: const Column(
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
-                  Expanded(
+                  const Expanded(
                     child: _HubNetworkMetric(
                       label: 'ENDEREÇO IP',
                       value: '192.168.1.8',
@@ -1248,38 +1253,39 @@ class _AutomacaoScreenState extends State<AutomacaoScreen> {
                       label: 'TRÁFEGO',
                       value: '18,4',
                       unit: ' MB/s',
-                      valueColor: Color(0xFF69B5FF),
+                      valueColor: const Color(0xFF69B5FF),
                     ),
                   ),
                 ],
               ),
-              SizedBox(height: 12),
+              const SizedBox(height: 12),
               Text(
                 'Ethernet 1 Gbps · MAC 06:A6:32:••:••:91',
-                style: TextStyle(color: cosMuted, fontSize: 9),
+                style: TextStyle(color: c.muted, fontSize: 9),
               ),
             ],
           ),
         ),
         const SizedBox(height: 15),
         _HubSectionTitle(
+          c: c,
           title: 'Serviços',
           trailing: 'Gerenciar',
-          onTrailingTap: _showHubServices,
+          onTrailingTap: () => _showHubServices(c),
         ),
         const SizedBox(height: 8),
         Container(
           padding: const EdgeInsets.symmetric(vertical: 5),
           decoration: BoxDecoration(
-            color: cosPanel,
+            color: c.panel,
             borderRadius: BorderRadius.circular(15),
-            border: Border.all(color: cosBorder),
+            border: Border.all(color: c.border),
           ),
-          child: const Column(
+          child: Column(
             children: [
-              _HubServiceRow(name: 'Home Assistant', port: ':8123'),
-              _HubServiceRow(name: 'MQTT Broker', port: ':1883'),
-              _HubServiceRow(name: 'Pi-hole', port: ':80'),
+              _HubServiceRow(c: c, name: 'Home Assistant', port: ':8123'),
+              _HubServiceRow(c: c, name: 'MQTT Broker', port: ':1883'),
+              _HubServiceRow(c: c, name: 'Pi-hole', port: ':80'),
             ],
           ),
         ),
@@ -1288,13 +1294,13 @@ class _AutomacaoScreenState extends State<AutomacaoScreen> {
           children: [
             Expanded(
               child: OutlinedButton.icon(
-                onPressed: () => _confirmHubAction(restart: true),
+                onPressed: () => _confirmHubAction(c, restart: true),
                 icon: const Icon(Icons.refresh_rounded, size: 18),
                 label: const Text('Reiniciar'),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: cosForeground,
-                  backgroundColor: cosPanelElevated,
-                  side: BorderSide(color: cosPanelElevated),
+                  foregroundColor: c.fg,
+                  backgroundColor: c.panelElevated,
+                  side: BorderSide(color: c.panelElevated),
                   minimumSize: const Size.fromHeight(48),
                 ),
               ),
@@ -1302,7 +1308,7 @@ class _AutomacaoScreenState extends State<AutomacaoScreen> {
             const SizedBox(width: 9),
             Expanded(
               child: FilledButton.icon(
-                onPressed: () => _confirmHubAction(restart: false),
+                onPressed: () => _confirmHubAction(c, restart: false),
                 icon: const Icon(Icons.power_settings_new_rounded, size: 17),
                 label: const Text('Desligar seguro'),
                 style: FilledButton.styleFrom(
@@ -1319,30 +1325,30 @@ class _AutomacaoScreenState extends State<AutomacaoScreen> {
           ],
         ),
         const SizedBox(height: 7),
-        const Text(
+        Text(
           'Dados de sistema e serviços são ilustrativos; o Raspberry Pi ainda não está conectado.',
-          style: TextStyle(color: cosMuted, fontSize: 9),
+          style: TextStyle(color: c.muted, fontSize: 9),
         ),
       ],
     );
   }
 
-  Future<void> _showHubServices() async {
+  Future<void> _showHubServices(CosColors c) async {
     await showDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: cosPanel,
+        backgroundColor: c.panel,
         title: const Text('Serviços do Raspberry Hub'),
-        content: const Column(
+        content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            _HubServiceRow(name: 'Home Assistant', port: ':8123'),
-            _HubServiceRow(name: 'MQTT Broker', port: ':1883'),
-            _HubServiceRow(name: 'Pi-hole', port: ':80'),
-            SizedBox(height: 12),
+            _HubServiceRow(c: c, name: 'Home Assistant', port: ':8123'),
+            _HubServiceRow(c: c, name: 'MQTT Broker', port: ':1883'),
+            _HubServiceRow(c: c, name: 'Pi-hole', port: ':80'),
+            const SizedBox(height: 12),
             Text(
               'A conexão com o Raspberry Pi não está configurada. O status dos serviços é apenas demonstrativo.',
-              style: TextStyle(color: cosMuted, fontSize: 11, height: 1.4),
+              style: TextStyle(color: c.muted, fontSize: 11, height: 1.4),
             ),
           ],
         ),
@@ -1356,11 +1362,11 @@ class _AutomacaoScreenState extends State<AutomacaoScreen> {
     );
   }
 
-  Future<void> _confirmHubAction({required bool restart}) async {
+  Future<void> _confirmHubAction(CosColors c, {required bool restart}) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: cosPanel,
+        backgroundColor: c.panel,
         title: Text(
           restart ? 'Reiniciar Raspberry Hub?' : 'Desligar Raspberry Hub?',
         ),
@@ -1368,7 +1374,7 @@ class _AutomacaoScreenState extends State<AutomacaoScreen> {
           restart
               ? 'O hub ainda não está conectado. Nenhum comando de reinício será enviado.'
               : 'O hub ainda não está conectado. Nenhum comando de desligamento será enviado.',
-          style: const TextStyle(color: cosMuted, height: 1.4),
+          style: TextStyle(color: c.muted, height: 1.4),
         ),
         actions: [
           TextButton(
@@ -1400,14 +1406,14 @@ class _AutomacaoScreenState extends State<AutomacaoScreen> {
     );
   }
 
-  Widget _buildConsumptionCard(AutomacaoDevice device) {
+  Widget _buildConsumptionCard(CosColors c, AutomacaoDevice device) {
     final total = widget.data.consumptionKwh(device);
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: cosPanel,
+        color: c.panel,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: cosBorder),
+        border: Border.all(color: c.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1418,15 +1424,15 @@ class _AutomacaoScreenState extends State<AutomacaoScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'Consumo estimado da sessão',
-                      style: TextStyle(color: cosMuted, fontSize: 11),
+                      style: TextStyle(color: c.muted, fontSize: 11),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       '${total.toStringAsFixed(6)} kWh',
-                      style: const TextStyle(
-                        color: cosMint,
+                      style: TextStyle(
+                        color: c.mint,
                         fontSize: 20,
                         fontWeight: FontWeight.w800,
                       ),
@@ -1436,7 +1442,7 @@ class _AutomacaoScreenState extends State<AutomacaoScreen> {
               ),
               TextButton(
                 onPressed: _registerConsumption,
-                style: TextButton.styleFrom(foregroundColor: cosMint),
+                style: TextButton.styleFrom(foregroundColor: c.mint),
                 child: const Text('Registrar'),
               ),
             ],
@@ -1444,10 +1450,10 @@ class _AutomacaoScreenState extends State<AutomacaoScreen> {
           const SizedBox(height: 7),
           Text(
             '${device.name} · estimativa acumulada nesta sessão',
-            style: const TextStyle(color: cosMuted, fontSize: 10),
+            style: TextStyle(color: c.muted, fontSize: 10),
           ),
           if (widget.data.registros.isNotEmpty) ...[
-            const Divider(color: cosBorder, height: 20),
+            Divider(color: c.border, height: 20),
             for (final record
                 in widget.data.registros
                     .where((record) => record.deviceId == device.id)
@@ -1457,14 +1463,14 @@ class _AutomacaoScreenState extends State<AutomacaoScreen> {
                 child: Text(
                   '${TimeOfDay.fromDateTime(record.data).format(context)} · '
                   '${record.deviceName} · ${record.totalKwh.toStringAsFixed(6)} kWh',
-                  style: const TextStyle(color: cosMuted, fontSize: 10),
+                  style: TextStyle(color: c.muted, fontSize: 10),
                 ),
               ),
           ],
           const SizedBox(height: 4),
-          const Text(
+          Text(
             'Estimativa local (9 W lâmpada / 60 W tomada); não é leitura de sensor.',
-            style: TextStyle(color: cosMuted, fontSize: 9),
+            style: TextStyle(color: c.muted, fontSize: 9),
           ),
         ],
       ),
@@ -1472,22 +1478,28 @@ class _AutomacaoScreenState extends State<AutomacaoScreen> {
   }
 }
 
+// =====================================================
+// PALETA E WIDGETS AUXILIARES
+// =====================================================
+
 const _palette = [
   Color(0xFFFF5C5C),
   Color(0xFFFF984F),
   Color(0xFFFFD15C),
-  cosMint,
+  Color(0xFF4FE0C0),
   Color(0xFF57B7FF),
   Color(0xFF9C75FF),
   Color(0xFFE66BEB),
 ];
 
 class _HubSectionTitle extends StatelessWidget {
+  final CosColors c;
   final String title;
   final String? trailing;
   final VoidCallback? onTrailingTap;
 
   const _HubSectionTitle({
+    required this.c,
     required this.title,
     this.trailing,
     this.onTrailingTap,
@@ -1500,8 +1512,8 @@ class _HubSectionTitle extends StatelessWidget {
         Expanded(
           child: Text(
             title,
-            style: const TextStyle(
-              color: cosForeground,
+            style: TextStyle(
+              color: c.fg,
               fontSize: 14,
               fontWeight: FontWeight.w800,
             ),
@@ -1512,8 +1524,8 @@ class _HubSectionTitle extends StatelessWidget {
             onTap: onTrailingTap,
             child: Text(
               trailing!,
-              style: const TextStyle(
-                color: cosMint,
+              style: TextStyle(
+                color: c.mint,
                 fontSize: 10,
                 fontWeight: FontWeight.w700,
               ),
@@ -1525,6 +1537,7 @@ class _HubSectionTitle extends StatelessWidget {
 }
 
 class _HubResourceRow extends StatelessWidget {
+  final CosColors c;
   final String label;
   final String value;
   final String detail;
@@ -1532,6 +1545,7 @@ class _HubResourceRow extends StatelessWidget {
   final Color color;
 
   const _HubResourceRow({
+    required this.c,
     required this.label,
     required this.value,
     required this.detail,
@@ -1549,8 +1563,8 @@ class _HubResourceRow extends StatelessWidget {
             Expanded(
               child: Text(
                 label,
-                style: const TextStyle(
-                  color: cosForeground,
+                style: TextStyle(
+                  color: c.fg,
                   fontSize: 10,
                   fontWeight: FontWeight.w700,
                 ),
@@ -1565,12 +1579,12 @@ class _HubResourceRow extends StatelessWidget {
           child: LinearProgressIndicator(
             value: fraction,
             minHeight: 5,
-            backgroundColor: cosPanelElevated,
+            backgroundColor: c.panelElevated,
             valueColor: AlwaysStoppedAnimation<Color>(color),
           ),
         ),
         const SizedBox(height: 3),
-        Text(detail, style: const TextStyle(color: cosMuted, fontSize: 8)),
+        Text(detail, style: TextStyle(color: c.muted, fontSize: 8)),
       ],
     );
   }
@@ -1586,15 +1600,16 @@ class _HubNetworkMetric extends StatelessWidget {
     required this.label,
     required this.value,
     this.unit = '',
-    this.valueColor = cosForeground,
+    this.valueColor = const Color(0xFFF1F5F8),
   });
 
   @override
   Widget build(BuildContext context) {
+    final c = CosColors.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(color: cosMuted, fontSize: 8)),
+        Text(label, style: TextStyle(color: c.muted, fontSize: 8)),
         const SizedBox(height: 4),
         Text.rich(
           TextSpan(
@@ -1609,7 +1624,7 @@ class _HubNetworkMetric extends StatelessWidget {
               ),
               TextSpan(
                 text: unit,
-                style: const TextStyle(color: cosMuted, fontSize: 9),
+                style: TextStyle(color: c.muted, fontSize: 9),
               ),
             ],
           ),
@@ -1620,10 +1635,15 @@ class _HubNetworkMetric extends StatelessWidget {
 }
 
 class _HubServiceRow extends StatelessWidget {
+  final CosColors c;
   final String name;
   final String port;
 
-  const _HubServiceRow({required this.name, required this.port});
+  const _HubServiceRow({
+    required this.c,
+    required this.name,
+    required this.port,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1631,7 +1651,7 @@ class _HubServiceRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
       child: Row(
         children: [
-          const Icon(Icons.widgets_outlined, color: cosMuted, size: 15),
+          Icon(Icons.widgets_outlined, color: c.muted, size: 15),
           const SizedBox(width: 8),
           Expanded(
             child: Text.rich(
@@ -1639,11 +1659,11 @@ class _HubServiceRow extends StatelessWidget {
                 children: [
                   TextSpan(
                     text: name,
-                    style: const TextStyle(color: cosForeground, fontSize: 9),
+                    style: TextStyle(color: c.fg, fontSize: 9),
                   ),
                   TextSpan(
                     text: ' $port',
-                    style: const TextStyle(color: cosMuted, fontSize: 9),
+                    style: TextStyle(color: c.muted, fontSize: 9),
                   ),
                 ],
               ),
@@ -1652,13 +1672,13 @@ class _HubServiceRow extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
             decoration: BoxDecoration(
-              color: const Color(0xFF163B37),
+              color: c.mint.withValues(alpha: 0.14),
               borderRadius: BorderRadius.circular(99),
             ),
-            child: const Text(
+            child: Text(
               'ATIVO',
               style: TextStyle(
-                color: cosMint,
+                color: c.mint,
                 fontSize: 8,
                 fontWeight: FontWeight.w800,
               ),
@@ -1683,13 +1703,14 @@ class _PlugMetricCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = CosColors.of(context);
     return Container(
       height: 64,
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 9),
       decoration: BoxDecoration(
-        color: cosPanel,
+        color: c.panel,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: cosBorder),
+        border: Border.all(color: c.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1698,7 +1719,7 @@ class _PlugMetricCard extends StatelessWidget {
             label,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(color: cosMuted, fontSize: 8),
+            style: TextStyle(color: c.muted, fontSize: 8),
           ),
           const Spacer(),
           Text.rich(
@@ -1706,15 +1727,15 @@ class _PlugMetricCard extends StatelessWidget {
               children: [
                 TextSpan(
                   text: value,
-                  style: const TextStyle(
-                    color: cosForeground,
+                  style: TextStyle(
+                    color: c.fg,
                     fontSize: 16,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
                 TextSpan(
                   text: ' $unit',
-                  style: const TextStyle(color: cosMuted, fontSize: 9),
+                  style: TextStyle(color: c.muted, fontSize: 9),
                 ),
               ],
             ),
@@ -1726,7 +1747,9 @@ class _PlugMetricCard extends StatelessWidget {
 }
 
 class _WeeklyConsumptionChart extends StatelessWidget {
-  const _WeeklyConsumptionChart();
+  final CosColors c;
+
+  const _WeeklyConsumptionChart({required this.c});
 
   static const _values = [
     0.35,
@@ -1758,8 +1781,10 @@ class _WeeklyConsumptionChart extends StatelessWidget {
                   child: DecoratedBox(
                     decoration: BoxDecoration(
                       color: index >= 7
-                          ? (index == 8 ? cosMint : const Color(0xFF315D54))
-                          : cosPanelElevated,
+                          ? (index == 8
+                                ? c.mint
+                                : c.mint.withValues(alpha: 0.35))
+                          : c.panelElevated,
                       borderRadius: const BorderRadius.vertical(
                         top: Radius.circular(4),
                       ),
@@ -1775,6 +1800,7 @@ class _WeeklyConsumptionChart extends StatelessWidget {
 }
 
 class _PlugScheduleRow extends StatelessWidget {
+  final CosColors c;
   final IconData icon;
   final String title;
   final String subtitle;
@@ -1782,6 +1808,7 @@ class _PlugScheduleRow extends StatelessWidget {
   final VoidCallback onTap;
 
   const _PlugScheduleRow({
+    required this.c,
     required this.icon,
     required this.title,
     required this.subtitle,
@@ -1792,7 +1819,7 @@ class _PlugScheduleRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: cosPanel,
+      color: c.panel,
       child: ListTile(
         onTap: onTap,
         contentPadding: const EdgeInsets.symmetric(horizontal: 11, vertical: 1),
@@ -1800,23 +1827,20 @@ class _PlugScheduleRow extends StatelessWidget {
           width: 36,
           height: 36,
           decoration: BoxDecoration(
-            color: cosPanelElevated,
+            color: c.panelElevated,
             borderRadius: BorderRadius.circular(9),
           ),
-          child: Icon(icon, color: cosMint, size: 18),
+          child: Icon(icon, color: c.mint, size: 18),
         ),
         title: Text(
           title,
-          style: const TextStyle(
-            color: cosForeground,
+          style: TextStyle(
+            color: c.fg,
             fontSize: 12,
             fontWeight: FontWeight.w700,
           ),
         ),
-        subtitle: Text(
-          subtitle,
-          style: const TextStyle(color: cosMuted, fontSize: 9),
-        ),
+        subtitle: Text(subtitle, style: TextStyle(color: c.muted, fontSize: 9)),
         trailing: trailing,
       ),
     );
@@ -1838,12 +1862,14 @@ class _AutomationDevice {
 }
 
 class _DeviceSelectorCard extends StatelessWidget {
+  final CosColors c;
   final _AutomationDevice device;
   final bool selected;
   final bool online;
   final VoidCallback onTap;
 
   const _DeviceSelectorCard({
+    required this.c,
     required this.device,
     required this.selected,
     required this.online,
@@ -1855,7 +1881,7 @@ class _DeviceSelectorCard extends StatelessWidget {
     return SizedBox(
       width: 116,
       child: Material(
-        color: selected ? const Color(0xFF163B37) : cosPanel,
+        color: selected ? c.mint.withValues(alpha: 0.16) : c.panel,
         borderRadius: BorderRadius.circular(15),
         child: InkWell(
           onTap: onTap,
@@ -1864,24 +1890,20 @@ class _DeviceSelectorCard extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(15),
-              border: Border.all(color: selected ? cosMint : cosBorder),
+              border: Border.all(color: selected ? c.mint : c.border),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(
-                  device.icon,
-                  color: selected ? cosMint : cosMuted,
-                  size: 20,
-                ),
+                Icon(device.icon, color: selected ? c.mint : c.muted, size: 20),
                 const SizedBox(height: 5),
                 Text(
                   device.title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: cosForeground,
+                  style: TextStyle(
+                    color: c.fg,
                     fontSize: 10,
                     fontWeight: FontWeight.w800,
                   ),
@@ -1890,7 +1912,7 @@ class _DeviceSelectorCard extends StatelessWidget {
                   online ? device.subtitle : 'não integrado',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: cosMuted, fontSize: 8),
+                  style: TextStyle(color: c.muted, fontSize: 8),
                 ),
               ],
             ),
@@ -1902,6 +1924,7 @@ class _DeviceSelectorCard extends StatelessWidget {
 }
 
 class _SliderLine extends StatelessWidget {
+  final CosColors c;
   final String title;
   final String valueLabel;
   final double value;
@@ -1909,6 +1932,7 @@ class _SliderLine extends StatelessWidget {
   final ValueChanged<double> onChanged;
 
   const _SliderLine({
+    required this.c,
     required this.title,
     required this.valueLabel,
     required this.value,
@@ -1925,8 +1949,8 @@ class _SliderLine extends StatelessWidget {
             Expanded(
               child: Text(
                 title,
-                style: const TextStyle(
-                  color: cosForeground,
+                style: TextStyle(
+                  color: c.fg,
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
                 ),
@@ -1946,7 +1970,7 @@ class _SliderLine extends StatelessWidget {
           data: SliderTheme.of(context).copyWith(
             trackHeight: 5,
             activeTrackColor: activeColor,
-            inactiveTrackColor: cosPanelElevated,
+            inactiveTrackColor: c.panelElevated,
             thumbColor: activeColor,
             overlayShape: SliderComponentShape.noOverlay,
           ),
@@ -2006,11 +2030,13 @@ class _LightingScene {
 }
 
 class _SceneCard extends StatelessWidget {
+  final CosColors c;
   final _LightingScene scene;
   final bool selected;
   final VoidCallback onTap;
 
   const _SceneCard({
+    required this.c,
     required this.scene,
     required this.selected,
     required this.onTap,
@@ -2021,7 +2047,7 @@ class _SceneCard extends StatelessWidget {
     return SizedBox(
       width: 90,
       child: Material(
-        color: selected ? const Color(0xFF163B37) : cosPanel,
+        color: selected ? c.mint.withValues(alpha: 0.16) : c.panel,
         borderRadius: BorderRadius.circular(13),
         child: InkWell(
           onTap: onTap,
@@ -2029,21 +2055,14 @@ class _SceneCard extends StatelessWidget {
           child: Container(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(13),
-              border: Border.all(color: selected ? cosMint : cosBorder),
+              border: Border.all(color: selected ? c.mint : c.border),
             ),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(
-                  scene.icon,
-                  color: selected ? cosMint : cosMuted,
-                  size: 19,
-                ),
+                Icon(scene.icon, color: selected ? c.mint : c.muted, size: 19),
                 const SizedBox(height: 5),
-                Text(
-                  scene.name,
-                  style: const TextStyle(color: cosForeground, fontSize: 9),
-                ),
+                Text(scene.name, style: TextStyle(color: c.fg, fontSize: 9)),
               ],
             ),
           ),
@@ -2084,8 +2103,9 @@ class _ColorPickerDialogState extends State<_ColorPickerDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final c = CosColors.of(context);
     return AlertDialog(
-      backgroundColor: cosPanel,
+      backgroundColor: c.panel,
       title: const Text('Personalizar cor'),
       content: Column(
         mainAxisSize: MainAxisSize.min,
@@ -2118,7 +2138,7 @@ class _ColorPickerDialogState extends State<_ColorPickerDialog> {
           const SizedBox(height: 12),
           Text(
             '#${_selectedColor.toARGB32().toRadixString(16).substring(2).toUpperCase()}',
-            style: const TextStyle(color: cosMuted, fontSize: 12),
+            style: TextStyle(color: c.muted, fontSize: 12),
           ),
         ],
       ),

@@ -2,24 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../services/firebase_service.dart';
+import '../theme.dart';
 import '../widgets/cos_app_navigation.dart';
-
-// =====================================================
-// TEMA DO PERFIL
-// =====================================================
-
-final perfilThemeMode = ValueNotifier<ThemeMode>(ThemeMode.system);
-
-// =====================================================
-// TELA DE PERFIL
-// =====================================================
 
 class PerfilScreen extends StatelessWidget {
   final List<String> ambientesCasa;
   final List<String> dispositivosCasa;
   final ValueChanged<int> onNavigate;
-
-  // A dashboard será responsável pelo logout.
   final Future<void> Function() onLogout;
 
   const PerfilScreen({
@@ -34,56 +23,17 @@ class PerfilScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return ValueListenableBuilder<ThemeMode>(
       valueListenable: perfilThemeMode,
-      builder: (context, mode, _) {
-        final dark =
-            mode == ThemeMode.dark ||
-            (mode == ThemeMode.system &&
-                MediaQuery.platformBrightnessOf(context) == Brightness.dark);
-
-        final scheme =
-            ColorScheme.fromSeed(
-              seedColor: const Color(0xFF00836F),
-              brightness: dark ? Brightness.dark : Brightness.light,
-            ).copyWith(
-              primary: dark ? const Color(0xFF4FE0C0) : const Color(0xFF007C68),
-              surface: dark ? const Color(0xFF10151B) : Colors.white,
-              onSurface: dark
-                  ? const Color(0xFFF1F5F8)
-                  : const Color(0xFF172C30),
-              onSurfaceVariant: dark
-                  ? const Color(0xFF96A5B1)
-                  : const Color(0xFF566970),
-              outlineVariant: dark
-                  ? const Color(0xFF293640)
-                  : const Color(0xFFD6E2DF),
-              primaryContainer: dark
-                  ? const Color(0xFF173D35)
-                  : const Color(0xFFDDF5ED),
-            );
-
-        return Theme(
-          data: ThemeData(
-            useMaterial3: true,
-            colorScheme: scheme,
-            scaffoldBackgroundColor: dark
-                ? const Color(0xFF080B0F)
-                : const Color(0xFFF3F7F6),
-          ),
-          child: _PerfilBody(
-            ambientesCasa: ambientesCasa,
-            dispositivosCasa: dispositivosCasa,
-            onNavigate: onNavigate,
-            onLogout: onLogout,
-          ),
+      builder: (context, _, _) {
+        return _PerfilBody(
+          ambientesCasa: ambientesCasa,
+          dispositivosCasa: dispositivosCasa,
+          onNavigate: onNavigate,
+          onLogout: onLogout,
         );
       },
     );
   }
 }
-
-// =====================================================
-// CORPO DO PERFIL
-// =====================================================
 
 class _PerfilBody extends StatefulWidget {
   final List<String> ambientesCasa;
@@ -104,7 +54,6 @@ class _PerfilBody extends StatefulWidget {
 
 class _PerfilBodyState extends State<_PerfilBody> {
   String _cidade = 'Cidade não informada';
-
   bool _cidadeEditada = false;
   bool _saindo = false;
 
@@ -114,30 +63,21 @@ class _PerfilBodyState extends State<_PerfilBody> {
     _carregarCidade();
   }
 
-  // =====================================================
-  // CARREGAR CIDADE DO FIRESTORE
-  // =====================================================
-
   Future<void> _carregarCidade() async {
     final usuario = FirebaseService.usuarioAtual;
-
     if (usuario == null) return;
 
     try {
       final perfil = await FirebaseService.obterPerfil(usuario.uid);
-
       final cidade = perfil?['cidade'];
 
       if (!mounted || _cidadeEditada) return;
 
       if (cidade is String && cidade.trim().isNotEmpty) {
-        setState(() {
-          _cidade = cidade.trim();
-        });
+        setState(() => _cidade = cidade.trim());
       }
     } on FirebaseException catch (error) {
       if (!mounted) return;
-
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -151,33 +91,21 @@ class _PerfilBodyState extends State<_PerfilBody> {
     }
   }
 
-  // =====================================================
-  // JANELA DE DETALHES
-  // =====================================================
-
   void _details(BuildContext context, String titulo, String descricao) {
     showDialog<void>(
       context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: Text(titulo),
-          content: Text(descricao),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(dialogContext);
-              },
-              child: const Text('Fechar'),
-            ),
-          ],
-        );
-      },
+      builder: (dialogContext) => AlertDialog(
+        title: Text(titulo),
+        content: Text(descricao),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Fechar'),
+          ),
+        ],
+      ),
     );
   }
-
-  // =====================================================
-  // EDITAR CIDADE
-  // =====================================================
 
   Future<void> _editarCidade(BuildContext context) async {
     final cidade = await showDialog<String>(
@@ -195,12 +123,10 @@ class _PerfilBodyState extends State<_PerfilBody> {
     });
   }
 
-  // =====================================================
-  // RESUMO DA CASA
-  // =====================================================
-
   void _mostrarResumoCasa(BuildContext context) {
-    Widget secao(String titulo, List<String> itens, String mensagemVazia) {
+    final c = CosColors.of(context);
+
+    Widget secao(String titulo, List<String> itens, String vazio) {
       return Padding(
         padding: const EdgeInsets.only(bottom: 16),
         child: Column(
@@ -209,12 +135,7 @@ class _PerfilBodyState extends State<_PerfilBody> {
             Text(titulo, style: const TextStyle(fontWeight: FontWeight.w700)),
             const SizedBox(height: 8),
             if (itens.isEmpty)
-              Text(
-                mensagemVazia,
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              )
+              Text(vazio, style: TextStyle(color: c.muted))
             else
               for (final item in itens)
                 Padding(
@@ -228,47 +149,37 @@ class _PerfilBodyState extends State<_PerfilBody> {
 
     showDialog<void>(
       context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: const Text('Resumo da casa'),
-          content: SizedBox(
-            width: 420,
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  secao(
-                    'Ambientes '
-                        '(${widget.ambientesCasa.length})',
-                    widget.ambientesCasa,
-                    'Nenhum ambiente cadastrado.',
-                  ),
-                  secao(
-                    'Dispositivos '
-                        '(${widget.dispositivosCasa.length})',
-                    widget.dispositivosCasa,
-                    'Nenhum dispositivo cadastrado.',
-                  ),
-                ],
-              ),
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Resumo da casa'),
+        content: SizedBox(
+          width: 420,
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                secao(
+                  'Ambientes (${widget.ambientesCasa.length})',
+                  widget.ambientesCasa,
+                  'Nenhum ambiente cadastrado.',
+                ),
+                secao(
+                  'Dispositivos (${widget.dispositivosCasa.length})',
+                  widget.dispositivosCasa,
+                  'Nenhum dispositivo cadastrado.',
+                ),
+              ],
             ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(dialogContext);
-              },
-              child: const Text('Fechar'),
-            ),
-          ],
-        );
-      },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Fechar'),
+          ),
+        ],
+      ),
     );
   }
-
-  // =====================================================
-  // CONFIGURAÇÃO DE APARÊNCIA
-  // =====================================================
 
   void _appearance(BuildContext context) {
     showModalBottomSheet<void>(
@@ -286,7 +197,6 @@ class _PerfilBodyState extends State<_PerfilBody> {
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
                 const SizedBox(height: 12),
-
                 for (final option in [
                   (
                     ThemeMode.system,
@@ -304,7 +214,6 @@ class _PerfilBodyState extends State<_PerfilBody> {
                         : null,
                     onTap: () {
                       perfilThemeMode.value = option.$1;
-
                       Navigator.pop(sheetContext);
                     },
                   ),
@@ -316,16 +225,12 @@ class _PerfilBodyState extends State<_PerfilBody> {
     );
   }
 
-  // =====================================================
-  // NOVO: CONFIGURAÇÕES DO PERFIL
-  // =====================================================
-
   void _abrirConfiguracoesPerfil() {
     showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
       builder: (sheetContext) {
-        final c = Theme.of(sheetContext).colorScheme;
+        final c = CosColors.of(sheetContext);
 
         return SafeArea(
           child: Padding(
@@ -337,51 +242,42 @@ class _PerfilBodyState extends State<_PerfilBody> {
                   'Configurações do perfil',
                   style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
                 ),
-
                 const SizedBox(height: 12),
-
                 ListTile(
-                  leading: Icon(Icons.shield_outlined, color: c.primary),
+                  leading: Icon(Icons.shield_outlined, color: c.mint),
                   title: const Text('Segurança'),
                   subtitle: const Text('Informações de acesso'),
                   onTap: () {
                     Navigator.pop(sheetContext);
-
                     _details(
                       context,
                       'Segurança',
-                      'Informações de segurança '
-                          'da sua conta COS.',
+                      'Informações de segurança da sua conta COS.',
                     );
                   },
                 ),
-
                 ListTile(
                   leading: Icon(
                     Icons.notifications_none_rounded,
-                    color: c.primary,
+                    color: c.mint,
                   ),
                   title: const Text('Notificações'),
                   subtitle: const Text('Preferências em desenvolvimento'),
                   onTap: () {
                     Navigator.pop(sheetContext);
-
                     _details(
                       context,
                       'Notificações',
-                      'As preferências de notificações '
-                          'ainda estão em desenvolvimento.',
+                      'As preferências de notificações ainda estão em desenvolvimento.',
                     );
                   },
                 ),
-
                 ListTile(
-                  leading: Icon(Icons.palette_outlined, color: c.primary),
+                  leading: Icon(Icons.palette_outlined, color: c.mint),
                   title: const Text('Aparência'),
                   subtitle: const Text('Escolher tema da tela'),
                   onTap: () {
                     Navigator.pop(sheetContext);
-
                     _appearance(context);
                   },
                 ),
@@ -393,46 +289,25 @@ class _PerfilBodyState extends State<_PerfilBody> {
     );
   }
 
-  // =====================================================
-  // NOVO: SOLICITAR LOGOUT À DASHBOARD
-  // =====================================================
-
   Future<void> _solicitarLogout() async {
     if (_saindo) return;
-
-    setState(() {
-      _saindo = true;
-    });
+    setState(() => _saindo = true);
 
     try {
-      // A dashboard mostra a confirmação,
-      // cancela a assinatura do Firestore,
-      // executa FirebaseService.logout()
-      // e retorna à SplashScreen.
       await widget.onLogout();
     } catch (e) {
       if (!mounted) return;
-
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Erro ao sair da conta: $e')));
     } finally {
-      if (mounted) {
-        setState(() {
-          _saindo = false;
-        });
-      }
+      if (mounted) setState(() => _saindo = false);
     }
   }
 
-  // =====================================================
-  // TELA PRINCIPAL
-  // =====================================================
-
   @override
   Widget build(BuildContext context) {
-    final c = Theme.of(context).colorScheme;
-
+    final c = CosColors.of(context);
     final user = FirebaseService.usuarioAtual;
 
     final name = (user?.displayName?.trim().isNotEmpty ?? false)
@@ -455,27 +330,19 @@ class _PerfilBodyState extends State<_PerfilBody> {
       ThemeMode.dark => 'Modo noite',
     };
 
-    // ===================================================
-    // CARTÕES
-    // ===================================================
-
     Widget panel(List<Widget> children) {
       return Card(
         margin: EdgeInsets.zero,
         elevation: 0,
-        color: c.surface,
+        color: c.panel,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(18),
-          side: BorderSide(color: c.outlineVariant),
+          side: BorderSide(color: c.border),
         ),
         clipBehavior: Clip.antiAlias,
         child: Column(children: children),
       );
     }
-
-    // ===================================================
-    // LINHAS DE INFORMAÇÕES
-    // ===================================================
 
     Widget row(IconData icon, String title, String subtitle, VoidCallback tap) {
       return ListTile(
@@ -483,31 +350,27 @@ class _PerfilBodyState extends State<_PerfilBody> {
         leading: Container(
           padding: const EdgeInsets.all(9),
           decoration: BoxDecoration(
-            color: c.primary.withValues(alpha: 0.08),
+            color: c.mint.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(10),
           ),
-          child: Icon(icon, color: c.primary, size: 21),
+          child: Icon(icon, color: c.mint, size: 21),
         ),
         title: Text(
           title,
-          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: c.fg,
+          ),
         ),
         subtitle: Text(
           subtitle,
-          style: TextStyle(fontSize: 11, color: c.onSurfaceVariant),
+          style: TextStyle(fontSize: 11, color: c.muted),
         ),
-        trailing: Icon(
-          Icons.chevron_right,
-          size: 19,
-          color: c.onSurfaceVariant,
-        ),
+        trailing: Icon(Icons.chevron_right, size: 19, color: c.muted),
         onTap: tap,
       );
     }
-
-    // ===================================================
-    // TÍTULOS DE SEÇÕES
-    // ===================================================
 
     Widget heading(String title, {String? action, VoidCallback? tap}) {
       return Padding(
@@ -517,9 +380,10 @@ class _PerfilBodyState extends State<_PerfilBody> {
             Expanded(
               child: Text(
                 title,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
+                  color: c.fg,
                 ),
               ),
             ),
@@ -529,46 +393,8 @@ class _PerfilBodyState extends State<_PerfilBody> {
       );
     }
 
-    // ===================================================
-    // MEMBRO ILUSTRATIVO DA TELA ORIGINAL
-    // ===================================================
-
-    Widget member(String initials, String name, String role, Color color) {
-      return ListTile(
-        leading: CircleAvatar(
-          radius: 17,
-          backgroundColor: color,
-          child: Text(
-            initials,
-            style: const TextStyle(
-              color: Color(0xFF09231F),
-              fontSize: 11,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-        title: Text(
-          name,
-          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-        ),
-        subtitle: Text(
-          role,
-          style: TextStyle(fontSize: 11, color: c.onSurfaceVariant),
-        ),
-        trailing: const Icon(Icons.chevron_right, size: 18),
-        onTap: () {
-          _details(
-            context,
-            name,
-            '$role\n'
-            'Membro ilustrativo, sem vínculo '
-            'com uma casa real.',
-          );
-        },
-      );
-    }
-
     return Scaffold(
+      backgroundColor: c.bg,
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
@@ -576,47 +402,39 @@ class _PerfilBodyState extends State<_PerfilBody> {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
               children: [
-                // ======================================
-                // CABEÇALHO
-                // ======================================
-
                 const CosAppHeader(
                   title: 'Perfil',
                   subtitle: 'Gerencie sua conta e sua casa',
                 ),
-
                 const SizedBox(height: 20),
-
-                // ======================================
-                // DADOS DO USUÁRIO
-                // ======================================
                 Card(
                   margin: EdgeInsets.zero,
                   elevation: 0,
-                  color: c.primaryContainer,
+                  color: c.mint.withValues(alpha: 0.12),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(18),
-                    side: BorderSide(color: c.primary.withValues(alpha: 0.4)),
+                    side: BorderSide(color: c.mint.withValues(alpha: 0.4)),
                   ),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     child: ListTile(
                       leading: CircleAvatar(
                         radius: 27,
-                        backgroundColor: const Color(0xFF4FE0C0),
+                        backgroundColor: c.mint,
                         child: Text(
                           initials.isEmpty ? '?' : initials,
-                          style: const TextStyle(
-                            color: Color(0xFF09231F),
+                          style: TextStyle(
+                            color: c.bg,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                       ),
                       title: Text(
                         name,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
+                          color: c.fg,
                         ),
                       ),
                       subtitle: Column(
@@ -624,10 +442,7 @@ class _PerfilBodyState extends State<_PerfilBody> {
                         children: [
                           Text(
                             email,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: c.onSurfaceVariant,
-                            ),
+                            style: TextStyle(fontSize: 12, color: c.muted),
                           ),
                           const SizedBox(height: 8),
                           Text(
@@ -636,104 +451,110 @@ class _PerfilBodyState extends State<_PerfilBody> {
                                 : 'PERFIL DA CONTA',
                             style: TextStyle(
                               fontSize: 10,
-                              color: c.primary,
+                              color: c.mint,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
                         ],
                       ),
-                      trailing: Icon(Icons.chevron_right, color: c.primary),
-                      onTap: () {
-                        _details(context, 'Minha conta', '$name\n$email');
-                      },
+                      trailing: Icon(Icons.chevron_right, color: c.mint),
+                      onTap: () =>
+                          _details(context, 'Minha conta', '$name\n$email'),
                     ),
                   ),
                 ),
-
-                // ======================================
-                // INFORMAÇÕES DA CASA
-                // ======================================
                 heading(
                   'Minha casa',
                   action: 'Editar',
                   tap: () => _editarCidade(context),
                 ),
-
                 panel([
                   row(
                     Icons.location_on_outlined,
                     'Cidade da casa',
                     _cidade,
-                    () {
-                      _details(context, 'Casa', 'Cidade cadastrada: $_cidade.');
-                    },
+                    () => _details(
+                      context,
+                      'Casa',
+                      'Cidade cadastrada: $_cidade.',
+                    ),
                   ),
                   row(
                     Icons.home_outlined,
                     'Resumo',
                     '${widget.ambientesCasa.length} ambientes'
-                        ' · ${widget.dispositivosCasa.length}'
-                        ' dispositivos',
+                        ' · ${widget.dispositivosCasa.length} dispositivos',
                     () => _mostrarResumoCasa(context),
                   ),
                 ]),
-
-                // ======================================
-                // MEMBROS
-                // ======================================
                 heading(
                   'Membros',
                   action: '+ Convidar',
-                  tap: () {
-                    _details(
-                      context,
-                      'Convidar membro',
-                      'O convite de novos membros '
-                          'ainda não está disponível.',
-                    );
-                  },
+                  tap: () => _details(
+                    context,
+                    'Convidar membro',
+                    'O convite de novos membros ainda não está disponível.',
+                  ),
                 ),
-
                 panel([
-                  member(
-                    'PC',
-                    'Paulo Cesar',
-                    'Proprietário',
-                    const Color(0xFF4FE0C0),
+                  ListTile(
+                    leading: CircleAvatar(
+                      radius: 17,
+                      backgroundColor: c.mint,
+                      child: Text(
+                        'PC',
+                        style: TextStyle(
+                          color: c.bg,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    title: Text(
+                      'Paulo Cesar',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: c.fg,
+                      ),
+                    ),
+                    subtitle: Text(
+                      'Proprietário',
+                      style: TextStyle(fontSize: 11, color: c.muted),
+                    ),
+                    trailing: Icon(
+                      Icons.chevron_right,
+                      size: 18,
+                      color: c.muted,
+                    ),
+                    onTap: () => _details(
+                      context,
+                      'Paulo Cesar',
+                      'Proprietário\nMembro ilustrativo, sem vínculo com uma casa real.',
+                    ),
                   ),
                 ]),
-
-                // ======================================
-                // SEGURANÇA E PREFERÊNCIAS
-                // ======================================
                 heading('Segurança e preferências'),
-
                 panel([
                   row(
                     Icons.shield_outlined,
                     'Segurança',
                     'Informações de acesso',
-                    () {
-                      _details(
-                        context,
-                        'Segurança',
-                        'Gerencie as informações '
-                            'de acesso da sua conta.',
-                      );
-                    },
+                    () => _details(
+                      context,
+                      'Segurança',
+                      'Gerencie as informações de acesso da sua conta.',
+                    ),
                   ),
                   row(
                     Icons.notifications_none,
                     'Notificações',
                     'Preferências em desenvolvimento',
-                    () {
-                      _details(
-                        context,
-                        'Notificações',
-                        'As preferências de notificações '
-                            'ainda estão em desenvolvimento.',
-                      );
-                    },
+                    () => _details(
+                      context,
+                      'Notificações',
+                      'As preferências de notificações ainda estão em desenvolvimento.',
+                    ),
                   ),
                   row(
                     Icons.palette_outlined,
@@ -742,12 +563,7 @@ class _PerfilBodyState extends State<_PerfilBody> {
                     () => _appearance(context),
                   ),
                 ]),
-
                 const SizedBox(height: 22),
-
-                // ======================================
-                // BOTÃO DE CONFIGURAÇÕES
-                // ======================================
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton.icon(
@@ -755,10 +571,8 @@ class _PerfilBodyState extends State<_PerfilBody> {
                     icon: const Icon(Icons.settings_outlined),
                     label: const Text('Configurações do perfil'),
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: c.primary,
-                      side: BorderSide(
-                        color: c.primary.withValues(alpha: 0.45),
-                      ),
+                      foregroundColor: c.mint,
+                      side: BorderSide(color: c.mint.withValues(alpha: 0.45)),
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(14),
@@ -766,12 +580,7 @@ class _PerfilBodyState extends State<_PerfilBody> {
                     ),
                   ),
                 ),
-
                 const SizedBox(height: 12),
-
-                // ======================================
-                // BOTÃO DE LOGOUT CORRIGIDO
-                // ======================================
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton.icon(
@@ -788,17 +597,12 @@ class _PerfilBodyState extends State<_PerfilBody> {
                     ),
                   ),
                 ),
-
                 const SizedBox(height: 20),
               ],
             ),
           ),
         ),
       ),
-
-      // ================================================
-      // BARRA DE NAVEGAÇÃO
-      // ================================================
       bottomNavigationBar: CosAppNavigation(
         selectedIndex: 4,
         onSelected: widget.onNavigate,
@@ -807,13 +611,8 @@ class _PerfilBodyState extends State<_PerfilBody> {
   }
 }
 
-// =====================================================
-// DIÁLOGO DE EDIÇÃO DE CIDADE
-// =====================================================
-
 class _EditarCidadeDialog extends StatefulWidget {
   final String cidadeInicial;
-
   const _EditarCidadeDialog({required this.cidadeInicial});
 
   @override
@@ -822,7 +621,6 @@ class _EditarCidadeDialog extends StatefulWidget {
 
 class _EditarCidadeDialogState extends State<_EditarCidadeDialog> {
   late final TextEditingController _controller;
-
   final _formKey = GlobalKey<FormState>();
 
   bool _salvando = false;
@@ -831,7 +629,6 @@ class _EditarCidadeDialogState extends State<_EditarCidadeDialog> {
   @override
   void initState() {
     super.initState();
-
     _controller = TextEditingController(text: widget.cidadeInicial);
   }
 
@@ -842,12 +639,9 @@ class _EditarCidadeDialogState extends State<_EditarCidadeDialog> {
   }
 
   Future<void> _salvar() async {
-    if (_salvando || !_formKey.currentState!.validate()) {
-      return;
-    }
+    if (_salvando || !_formKey.currentState!.validate()) return;
 
     final cidade = _controller.text.trim();
-
     setState(() {
       _salvando = true;
       _erro = null;
@@ -855,13 +649,10 @@ class _EditarCidadeDialogState extends State<_EditarCidadeDialog> {
 
     try {
       await FirebaseService.atualizarCidadeCasa(cidade);
-
       if (!mounted) return;
-
       Navigator.pop(context, cidade);
     } on FirebaseException catch (error) {
       if (!mounted) return;
-
       setState(() {
         _salvando = false;
         _erro =
@@ -870,14 +661,12 @@ class _EditarCidadeDialogState extends State<_EditarCidadeDialog> {
       });
     } on StateError catch (error) {
       if (!mounted) return;
-
       setState(() {
         _salvando = false;
         _erro = error.message;
       });
     } catch (e) {
       if (!mounted) return;
-
       setState(() {
         _salvando = false;
         _erro = 'Erro ao salvar cidade: $e';
@@ -908,12 +697,10 @@ class _EditarCidadeDialogState extends State<_EditarCidadeDialog> {
                 if (valor == null || valor.trim().isEmpty) {
                   return 'Informe a cidade onde você mora.';
                 }
-
                 return null;
               },
               onFieldSubmitted: (_) => _salvar(),
             ),
-
             if (_erro != null) ...[
               const SizedBox(height: 12),
               Text(

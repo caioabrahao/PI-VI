@@ -12,23 +12,8 @@ import '../models/alerta.dart';
 import '../models/dispositivo_iot.dart';
 import '../services/dispositivo_iot_service.dart';
 import '../services/firebase_service.dart';
+import '../theme.dart';
 import '../widgets/cos_app_navigation.dart';
-
-// =====================================================
-// CORES DO COS
-// =====================================================
-
-const Color _bg = Color(0xFF080B0F);
-const Color _panel = Color(0xFF10151B);
-const Color _panel2 = Color(0xFF171E26);
-const Color _border = Color(0xFF293640);
-const Color _muted = Color(0xFF8A98A5);
-const Color _fg = Color(0xFFF1F5F8);
-const Color _mint = Color(0xFF4FE0C0);
-
-// =====================================================
-// DASHBOARD
-// =====================================================
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -58,10 +43,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   final List<_Atalho> _atalhos = [];
 
-  // =====================================================
-  // INICIALIZAÇÃO
-  // =====================================================
-
   @override
   void initState() {
     super.initState();
@@ -85,7 +66,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _assinatura = DispositivoIotService.observarDispositivos().listen(
         (lista) {
           if (!mounted || _saindo) return;
-
           setState(() {
             _dispositivos = lista;
             _carregando = false;
@@ -94,7 +74,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         },
         onError: (Object erro) {
           if (!mounted || _saindo) return;
-
           setState(() {
             _carregando = false;
             _erro = erro.toString();
@@ -103,7 +82,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
       );
     } catch (e) {
       if (!mounted) return;
-
       setState(() {
         _carregando = false;
         _erro = e.toString();
@@ -118,78 +96,43 @@ class _DashboardScreenState extends State<DashboardScreen> {
     super.dispose();
   }
 
-  // =====================================================
-  // DISPOSITIVOS
-  // =====================================================
-
   int get _totalDispositivos => _dispositivos.length;
-
   int get _dispositivosLigados => _dispositivos.where((d) => d.ligado).length;
 
   String _ambienteDe(DispositivoIot d) {
     final ambiente = d.ambienteId?.trim();
-
-    if (ambiente == null || ambiente.isEmpty) {
-      return 'Sem ambiente';
-    }
-
+    if (ambiente == null || ambiente.isEmpty) return 'Sem ambiente';
     return ambiente;
   }
 
-  bool _online(DispositivoIot d) {
-    return d.statusConexao == 'conectado';
-  }
+  bool _online(DispositivoIot d) => d.statusConexao == 'conectado';
 
   IconData _iconeDe(DispositivoIot d) {
     final tipo = d.tipo.toLowerCase();
-
     if (tipo.contains('luz') ||
         tipo.contains('lampada') ||
         tipo.contains('lâmpada')) {
       return Icons.lightbulb_outline_rounded;
     }
-
-    if (tipo.contains('tomada')) {
-      return Icons.power_rounded;
-    }
-
+    if (tipo.contains('tomada')) return Icons.power_rounded;
     if (tipo.contains('ar-condicionado') || tipo.contains('clima')) {
       return Icons.ac_unit_rounded;
     }
-
-    if (tipo.contains('tv') || tipo.contains('televisão')) {
+    if (tipo.contains('tv') || tipo.contains('televisão'))
       return Icons.tv_rounded;
-    }
-
-    if (tipo.contains('ventilador')) {
-      return Icons.air_rounded;
-    }
-
+    if (tipo.contains('ventilador')) return Icons.air_rounded;
     return Icons.devices_other_rounded;
   }
 
   String _tipoPeloIcone(IconData icone) {
-    if (icone == Icons.lightbulb_outline_rounded) {
-      return 'Lâmpada';
-    }
-
+    if (icone == Icons.lightbulb_outline_rounded) return 'Lâmpada';
     if (icone == Icons.power_rounded ||
         icone == Icons.electrical_services_outlined) {
       return 'Tomada';
     }
-
-    if (icone == Icons.ac_unit_rounded) {
-      return 'Ar-condicionado';
-    }
-
-    if (icone == Icons.tv_rounded) {
-      return 'TV';
-    }
-
-    if (icone == Icons.air_rounded) {
-      return 'Ventilador';
-    }
-
+    if (icone == Icons.ac_unit_rounded) return 'Ar-condicionado';
+    if (icone == Icons.tv_rounded) return 'TV';
+    if (icone == Icons.air_rounded) return 'Ventilador';
     return 'Outro';
   }
 
@@ -199,7 +142,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Future<void> _adicionarDispositivo(DispositivoListaItem item) async {
     final identificador = 'app-${DateTime.now().microsecondsSinceEpoch}';
-
     await DispositivoIotService.cadastrar(
       nome: item.nome,
       identificador: identificador,
@@ -228,113 +170,78 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
-  // =====================================================
-  // LOGOUT CENTRALIZADO
-  // UTILIZADO PELA DASHBOARD E PELO PERFIL
-  // =====================================================
-
   Future<void> _confirmarLogout() async {
     if (!mounted || _saindo) return;
+    final c = CosColors.of(context);
 
     final confirmar = await showDialog<bool>(
       context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          backgroundColor: _panel,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18),
-          ),
-          title: const Row(
-            children: [
-              Icon(Icons.logout_rounded, color: Colors.redAccent),
-              SizedBox(width: 10),
-              Flexible(
-                child: Text(
-                  'Sair da conta?',
-                  style: TextStyle(
-                    color: _fg,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18,
-                  ),
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: c.panel,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: Row(
+          children: [
+            const Icon(Icons.logout_rounded, color: Colors.redAccent),
+            const SizedBox(width: 10),
+            Flexible(
+              child: Text(
+                'Sair da conta?',
+                style: TextStyle(
+                  color: c.fg,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
                 ),
-              ),
-            ],
-          ),
-          content: const Text(
-            'Deseja realmente sair da sua conta COS?\n\n'
-            'Seus dispositivos continuarão salvos '
-            'no Cloud Firestore.',
-            style: TextStyle(color: _muted, fontSize: 13),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(dialogContext, false);
-              },
-              child: const Text('Cancelar'),
-            ),
-            TextButton.icon(
-              onPressed: () {
-                Navigator.pop(dialogContext, true);
-              },
-              icon: const Icon(
-                Icons.logout_rounded,
-                color: Colors.redAccent,
-                size: 18,
-              ),
-              label: const Text(
-                'Sair',
-                style: TextStyle(color: Colors.redAccent),
               ),
             ),
           ],
-        );
-      },
+        ),
+        content: Text(
+          'Deseja realmente sair da sua conta COS?\n\n'
+          'Seus dispositivos continuarão salvos no Cloud Firestore.',
+          style: TextStyle(color: c.muted, fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton.icon(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            icon: const Icon(
+              Icons.logout_rounded,
+              color: Colors.redAccent,
+              size: 18,
+            ),
+            label: const Text(
+              'Sair',
+              style: TextStyle(color: Colors.redAccent),
+            ),
+          ),
+        ],
+      ),
     );
 
-    if (confirmar != true || !mounted) {
-      return;
-    }
+    if (confirmar != true || !mounted) return;
 
-    setState(() {
-      _saindo = true;
-    });
+    setState(() => _saindo = true);
 
     try {
-      // 1. Interrompe atualizações do Firestore.
       await _assinatura?.cancel();
       _assinatura = null;
-
-      // 2. Encerra a autenticação.
       await FirebaseService.logout();
-
       if (!mounted) return;
-
-      // 3. Limpa as telas anteriores.
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(builder: (_) => const SplashScreen()),
         (route) => false,
       );
     } catch (e) {
       if (!mounted) return;
-
       _mostrarMensagem('Erro ao sair da conta: $e');
-
-      if (FirebaseService.usuarioAtual != null) {
-        _iniciarDispositivos();
-      }
+      if (FirebaseService.usuarioAtual != null) _iniciarDispositivos();
     } finally {
-      if (mounted) {
-        setState(() {
-          _saindo = false;
-        });
-      }
+      if (mounted) setState(() => _saindo = false);
     }
   }
-
-  // =====================================================
-  // NAVEGAÇÃO
-  // =====================================================
 
   Future<void> _selecionarAba(int index) async {
     if (!mounted || _saindo) return;
@@ -360,9 +267,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ambientes: _ambientes.map((a) => a.nome).toList(),
               onToggle: _alternarPorId,
               onAddDevice: _adicionarDispositivo,
-              onNavigate: (aba) {
-                _navegarDaSubtela(aba, 1);
-              },
+              onNavigate: (aba) => _navegarDaSubtela(aba, 1),
             ),
           ),
         );
@@ -372,7 +277,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         final dispositivosAutomacao = _dispositivos
             .where((d) {
               final tipo = d.tipo.toLowerCase();
-
               return tipo.contains('luz') ||
                   tipo.contains('lâmpada') ||
                   tipo.contains('lampada') ||
@@ -380,7 +284,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
             })
             .map((d) {
               final tipo = d.tipo.toLowerCase();
-
               return AutomacaoDevice(
                 id: d.id,
                 name: d.nome,
@@ -407,9 +310,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   }
                 }
               },
-              onNavigate: (aba) {
-                _navegarDaSubtela(aba, 2);
-              },
+              onNavigate: (aba) => _navegarDaSubtela(aba, 2),
             ),
           ),
         );
@@ -432,21 +333,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
             builder: (_) => PerfilScreen(
               ambientesCasa: _ambientes.map((a) {
                 final quantidade = _dispositivosDoAmbiente(a.nome).length;
-
                 return '${a.nome} — $quantidade dispositivos';
               }).toList(),
-
               dispositivosCasa: _dispositivos.map((d) {
-                return '${d.nome} — '
-                    '${_ambienteDe(d)} — '
+                return '${d.nome} — ${_ambienteDe(d)} — '
                     '${d.ligado ? 'Ligado' : 'Desligado'}';
               }).toList(),
-
-              onNavigate: (aba) {
-                _navegarDaSubtela(aba, 4);
-              },
-
-              // COMPATÍVEL COM O PERFIL.DART NOVO
+              onNavigate: (aba) => _navegarDaSubtela(aba, 4),
               onLogout: _confirmarLogout,
             ),
           ),
@@ -456,69 +349,52 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   void _navegarDaSubtela(int novaAba, int abaAtual) {
-    if (!mounted || _saindo || novaAba == abaAtual) {
-      return;
-    }
+    if (!mounted || _saindo || novaAba == abaAtual) return;
 
-    final navigator = Navigator.of(context);
-
-    navigator.popUntil((route) => route.isFirst);
+    Navigator.of(context).popUntil((route) => route.isFirst);
 
     if (novaAba != 0) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && !_saindo) {
-          _selecionarAba(novaAba);
-        }
+        if (mounted && !_saindo) _selecionarAba(novaAba);
       });
     }
   }
-
-  // =====================================================
-  // DIÁLOGOS
-  // =====================================================
 
   Future<String?> _pedirNome({
     required String titulo,
     String inicial = '',
   }) async {
+    final c = CosColors.of(context);
     final controller = TextEditingController(text: inicial);
 
     final resultado = await showDialog<String>(
       context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          backgroundColor: _panel,
-          title: Text(titulo, style: const TextStyle(color: _fg)),
-          content: TextField(
-            controller: controller,
-            autofocus: true,
-            maxLength: 80,
-            style: const TextStyle(color: _fg),
-            decoration: const InputDecoration(labelText: 'Nome'),
-            onSubmitted: (valor) {
-              Navigator.pop(dialogContext, valor.trim());
-            },
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: c.panel,
+        title: Text(titulo, style: TextStyle(color: c.fg)),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          maxLength: 80,
+          style: TextStyle(color: c.fg),
+          decoration: const InputDecoration(labelText: 'Nome'),
+          onSubmitted: (valor) => Navigator.pop(dialogContext, valor.trim()),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancelar'),
           ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(dialogContext);
-              },
-              child: const Text('Cancelar'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(dialogContext, controller.text.trim());
-              },
-              child: const Text('Salvar'),
-            ),
-          ],
-        );
-      },
+          ElevatedButton(
+            onPressed: () =>
+                Navigator.pop(dialogContext, controller.text.trim()),
+            child: const Text('Salvar'),
+          ),
+        ],
+      ),
     );
 
     controller.dispose();
-
     return resultado;
   }
 
@@ -526,51 +402,37 @@ class _DashboardScreenState extends State<DashboardScreen> {
     required String titulo,
     required String descricao,
   }) async {
+    final c = CosColors.of(context);
     final resultado = await showDialog<bool>(
       context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          backgroundColor: _panel,
-          title: Text(titulo, style: const TextStyle(color: _fg)),
-          content: Text(descricao, style: const TextStyle(color: _muted)),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(dialogContext, false);
-              },
-              child: const Text('Cancelar'),
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: c.panel,
+        title: Text(titulo, style: TextStyle(color: c.fg)),
+        content: Text(descricao, style: TextStyle(color: c.muted)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text(
+              'Confirmar',
+              style: TextStyle(color: Colors.redAccent),
             ),
-            TextButton(
-              onPressed: () {
-                Navigator.pop(dialogContext, true);
-              },
-              child: const Text(
-                'Confirmar',
-                style: TextStyle(color: Colors.redAccent),
-              ),
-            ),
-          ],
-        );
-      },
+          ),
+        ],
+      ),
     );
-
     return resultado ?? false;
   }
 
-  // =====================================================
-  // AMBIENTES
-  // =====================================================
-
-  int _quantidadeNoAmbiente(String nome) {
-    return _dispositivosDoAmbiente(nome).length;
-  }
+  int _quantidadeNoAmbiente(String nome) =>
+      _dispositivosDoAmbiente(nome).length;
 
   Future<void> _novoAmbiente() async {
     final nome = await _pedirNome(titulo: 'Novo ambiente');
-
-    if (nome == null || nome.isEmpty || !mounted) {
-      return;
-    }
+    if (nome == null || nome.isEmpty || !mounted) return;
 
     final existe = _ambientes.any(
       (a) => a.nome.toLowerCase() == nome.toLowerCase(),
@@ -584,7 +446,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     setState(() {
       _ambientes.add(_Ambiente(nome: nome, icone: Icons.meeting_room_outlined));
     });
-
     _mostrarMensagem('Ambiente criado!');
   }
 
@@ -614,7 +475,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     try {
       final dispositivos = _dispositivosDoAmbiente(ambiente.nome);
-
       for (final d in dispositivos) {
         await DispositivoIotService.atualizarCadastro(
           id: d.id,
@@ -624,13 +484,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ambienteId: novoNome,
         );
       }
-
       if (!mounted) return;
-
-      setState(() {
-        ambiente.nome = novoNome;
-      });
-
+      setState(() => ambiente.nome = novoNome);
       _mostrarMensagem('Ambiente atualizado!');
     } catch (e) {
       _mostrarMensagem('Erro ao atualizar ambiente: $e');
@@ -642,15 +497,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
       titulo: 'Excluir ambiente?',
       descricao:
           'Deseja excluir "${ambiente.nome}"?\n\n'
-          'Os dispositivos continuarão cadastrados, '
-          'mas ficarão sem ambiente.',
+          'Os dispositivos continuarão cadastrados, mas ficarão sem ambiente.',
     );
 
     if (!confirmado || !mounted) return;
 
     try {
       final dispositivos = _dispositivosDoAmbiente(ambiente.nome);
-
       for (final d in dispositivos) {
         await DispositivoIotService.atualizarCadastro(
           id: d.id,
@@ -660,13 +513,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ambienteId: null,
         );
       }
-
       if (!mounted) return;
-
-      setState(() {
-        _ambientes.remove(ambiente);
-      });
-
+      setState(() => _ambientes.remove(ambiente));
       _mostrarMensagem('Ambiente excluído!');
     } catch (e) {
       _mostrarMensagem('Erro ao excluir ambiente: $e');
@@ -674,101 +522,89 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _gerenciarAmbientes() async {
+    final c = CosColors.of(context);
+
     await showDialog<void>(
       context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          backgroundColor: _panel,
-          title: const Text(
-            'Gerenciar ambientes',
-            style: TextStyle(color: _fg),
-          ),
-          content: SizedBox(
-            width: 420,
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                maxHeight: MediaQuery.sizeOf(context).height * 0.55,
-              ),
-              child: _ambientes.isEmpty
-                  ? const Text(
-                      'Nenhum ambiente cadastrado.',
-                      style: TextStyle(color: _muted),
-                    )
-                  : ListView(
-                      shrinkWrap: true,
-                      children: _ambientes.map((ambiente) {
-                        return ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          title: Text(
-                            ambiente.nome,
-                            style: const TextStyle(color: _fg),
-                          ),
-                          subtitle: Text(
-                            '${_quantidadeNoAmbiente(ambiente.nome)} '
-                            'dispositivos',
-                            style: const TextStyle(color: _muted),
-                          ),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              IconButton(
-                                tooltip: 'Editar',
-                                icon: const Icon(
-                                  Icons.edit_outlined,
-                                  color: _mint,
-                                ),
-                                onPressed: () {
-                                  Navigator.pop(dialogContext);
-                                  _editarAmbiente(ambiente);
-                                },
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: c.panel,
+        title: Text('Gerenciar ambientes', style: TextStyle(color: c.fg)),
+        content: SizedBox(
+          width: 420,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.sizeOf(context).height * 0.55,
+            ),
+            child: _ambientes.isEmpty
+                ? Text(
+                    'Nenhum ambiente cadastrado.',
+                    style: TextStyle(color: c.muted),
+                  )
+                : ListView(
+                    shrinkWrap: true,
+                    children: _ambientes.map((ambiente) {
+                      return ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(
+                          ambiente.nome,
+                          style: TextStyle(color: c.fg),
+                        ),
+                        subtitle: Text(
+                          '${_quantidadeNoAmbiente(ambiente.nome)} dispositivos',
+                          style: TextStyle(color: c.muted),
+                        ),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              tooltip: 'Editar',
+                              icon: Icon(Icons.edit_outlined, color: c.mint),
+                              onPressed: () {
+                                Navigator.pop(dialogContext);
+                                _editarAmbiente(ambiente);
+                              },
+                            ),
+                            IconButton(
+                              tooltip: 'Excluir',
+                              icon: const Icon(
+                                Icons.delete_outline,
+                                color: Colors.redAccent,
                               ),
-                              IconButton(
-                                tooltip: 'Excluir',
-                                icon: const Icon(
-                                  Icons.delete_outline,
-                                  color: Colors.redAccent,
-                                ),
-                                onPressed: () {
-                                  Navigator.pop(dialogContext);
-                                  _excluirAmbiente(ambiente);
-                                },
-                              ),
-                            ],
-                          ),
-                        );
-                      }).toList(),
-                    ),
-            ),
+                              onPressed: () {
+                                Navigator.pop(dialogContext);
+                                _excluirAmbiente(ambiente);
+                              },
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  ),
           ),
-          actions: [
-            TextButton.icon(
-              onPressed: () {
-                Navigator.pop(dialogContext);
-                _novoAmbiente();
-              },
-              icon: const Icon(Icons.add),
-              label: const Text('Adicionar ambiente'),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.pop(dialogContext);
-              },
-              child: const Text('Fechar'),
-            ),
-          ],
-        );
-      },
+        ),
+        actions: [
+          TextButton.icon(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              _novoAmbiente();
+            },
+            icon: const Icon(Icons.add),
+            label: const Text('Adicionar ambiente'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Fechar'),
+          ),
+        ],
+      ),
     );
   }
-
-  // =====================================================
-  // ATALHOS
-  // =====================================================
 
   Future<Map<String, bool>?> _configurarAtalho(
     String titulo,
     Map<String, bool> inicial,
   ) async {
+    final c = CosColors.of(context);
     final configuracoes = Map<String, bool>.from(inicial);
 
     return showDialog<Map<String, bool>>(
@@ -777,8 +613,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
         return StatefulBuilder(
           builder: (context, atualizar) {
             return AlertDialog(
-              backgroundColor: _panel,
-              title: Text(titulo, style: const TextStyle(color: _fg)),
+              backgroundColor: c.panel,
+              title: Text(titulo, style: TextStyle(color: c.fg)),
               content: SizedBox(
                 width: 420,
                 child: ConstrainedBox(
@@ -789,19 +625,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     shrinkWrap: true,
                     children: _dispositivos.map((d) {
                       final selecionado = configuracoes.containsKey(d.id);
-
                       return Column(
                         children: [
                           CheckboxListTile(
                             value: selecionado,
-                            activeColor: _mint,
-                            title: Text(
-                              d.nome,
-                              style: const TextStyle(color: _fg),
-                            ),
+                            activeColor: c.mint,
+                            title: Text(d.nome, style: TextStyle(color: c.fg)),
                             subtitle: Text(
                               _ambienteDe(d),
-                              style: const TextStyle(color: _muted),
+                              style: TextStyle(color: c.muted),
                             ),
                             onChanged: (valor) {
                               atualizar(() {
@@ -816,15 +648,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           if (selecionado)
                             SwitchListTile(
                               value: configuracoes[d.id]!,
-                              title: const Text(
+                              title: Text(
                                 'Ligar ao executar',
-                                style: TextStyle(color: _muted, fontSize: 12),
+                                style: TextStyle(color: c.muted, fontSize: 12),
                               ),
-                              activeThumbColor: _mint,
+                              activeThumbColor: c.mint,
                               onChanged: (valor) {
-                                atualizar(() {
-                                  configuracoes[d.id] = valor;
-                                });
+                                atualizar(() => configuracoes[d.id] = valor);
                               },
                             ),
                         ],
@@ -835,18 +665,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
               actions: [
                 TextButton(
-                  onPressed: () {
-                    Navigator.pop(dialogContext);
-                  },
+                  onPressed: () => Navigator.pop(dialogContext),
                   child: const Text('Cancelar'),
                 ),
                 ElevatedButton(
-                  onPressed: () {
-                    Navigator.pop(
-                      dialogContext,
-                      Map<String, bool>.from(configuracoes),
-                    );
-                  },
+                  onPressed: () => Navigator.pop(
+                    dialogContext,
+                    Map<String, bool>.from(configuracoes),
+                  ),
                   child: const Text('Salvar'),
                 ),
               ],
@@ -864,24 +690,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
 
     final nome = await _pedirNome(titulo: 'Criar modo');
-
-    if (nome == null || nome.isEmpty || !mounted) {
-      return;
-    }
+    if (nome == null || nome.isEmpty || !mounted) return;
 
     final existe = _atalhos.any(
       (a) => a.nome.toLowerCase() == nome.toLowerCase(),
     );
-
     if (existe) {
       _mostrarMensagem('Já existe um modo com esse nome.');
       return;
     }
 
     final resultado = await _configurarAtalho(nome, {});
-
     if (!mounted || resultado == null) return;
-
     if (resultado.isEmpty) {
       _mostrarMensagem('Selecione pelo menos um dispositivo.');
       return;
@@ -890,7 +710,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     setState(() {
       _atalhos.add(_Atalho(nome: nome, configuracoes: resultado));
     });
-
     _mostrarMensagem('Modo criado!');
   }
 
@@ -899,20 +718,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
       'Editar ${atalho.nome}',
       atalho.configuracoes,
     );
-
     if (!mounted || resultado == null) return;
-
     if (resultado.isEmpty) {
       _mostrarMensagem('Selecione pelo menos um dispositivo.');
       return;
     }
-
     setState(() {
       atalho.configuracoes
         ..clear()
         ..addAll(resultado);
     });
-
     _mostrarMensagem('Modo atualizado!');
   }
 
@@ -921,83 +736,65 @@ class _DashboardScreenState extends State<DashboardScreen> {
       titulo: 'Excluir modo?',
       descricao: 'Deseja excluir o modo "${atalho.nome}"?',
     );
-
     if (!confirmado || !mounted) return;
-
-    setState(() {
-      _atalhos.remove(atalho);
-    });
+    setState(() => _atalhos.remove(atalho));
   }
 
   Future<void> _ativarAtalho(_Atalho atalho) async {
     var atualizados = 0;
-
     try {
       for (final entrada in atalho.configuracoes.entries) {
         final existe = _dispositivos.any((d) => d.id == entrada.key);
-
         if (!existe) continue;
-
         await DispositivoIotService.alterarEstado(
           id: entrada.key,
           ligado: entrada.value,
         );
-
         atualizados++;
       }
-
       _mostrarMensagem(
-        'Modo "${atalho.nome}" ativado: '
-        '$atualizados dispositivos atualizados.',
+        'Modo "${atalho.nome}" ativado: $atualizados dispositivos atualizados.',
       );
     } catch (e) {
       _mostrarMensagem('Erro ao ativar modo: $e');
     }
   }
 
-  // =====================================================
-  // MENSAGENS
-  // =====================================================
-
   void _mostrarMensagem(String texto) {
     if (!mounted) return;
-
+    final c = CosColors.of(context);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(texto),
-        backgroundColor: _panel2,
+        backgroundColor: c.panel2,
         behavior: SnackBarBehavior.floating,
       ),
     );
   }
 
-  // =====================================================
-  // INTERFACE PRINCIPAL
-  // =====================================================
-
   @override
   Widget build(BuildContext context) {
+    final c = CosColors.of(context);
+
     return Scaffold(
-      backgroundColor: _bg,
+      backgroundColor: c.bg,
       body: SafeArea(
         child: _carregando
-            ? const Center(child: CircularProgressIndicator(color: _mint))
+            ? Center(child: CircularProgressIndicator(color: c.mint))
             : _erro != null
-            ? _estadoErro()
-            : _conteudoDashboard(),
+            ? _estadoErro(c)
+            : _conteudoDashboard(c),
       ),
       bottomNavigationBar: CosAppNavigation(
         selectedIndex: 0,
         onSelected: (aba) {
-          if (aba != 0) {
-            _selecionarAba(aba);
-          }
+          if (aba != 0) _selecionarAba(aba);
         },
       ),
     );
   }
 
-  Widget _estadoErro() {
+  Widget _estadoErro(CosColors c) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -1009,7 +806,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             Text(
               'Erro ao carregar dispositivos:\n$_erro',
               textAlign: TextAlign.center,
-              style: const TextStyle(color: _fg),
+              style: TextStyle(color: c.fg),
             ),
             const SizedBox(height: 16),
             TextButton(
@@ -1018,7 +815,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   _carregando = true;
                   _erro = null;
                 });
-
                 _iniciarDispositivos();
               },
               child: const Text('Tentar novamente'),
@@ -1035,84 +831,60 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _conteudoDashboard() {
+  Widget _conteudoDashboard(CosColors c) {
     return CustomScrollView(
       slivers: [
         SliverPadding(
           padding: const EdgeInsets.fromLTRB(20, 14, 20, 28),
           sliver: SliverList(
             delegate: SliverChildListDelegate([
-              _cabecalho(),
-
+              _cabecalho(c),
               const SizedBox(height: 28),
-
-              _saudacao(),
-
+              _saudacao(c),
               const SizedBox(height: 22),
-
-              // TEMPERATURA DA CASA
-              _cartaoClima(),
-
+              _cartaoClima(c),
               const SizedBox(height: 14),
-
-              // DISPOSITIVOS E ENERGIA
-              _resumoDispositivos(),
-
+              _resumoDispositivos(c),
               const SizedBox(height: 28),
-
               _tituloSecao(
+                c,
                 'Dispositivos',
-                '$_dispositivosLigados de '
-                    '$_totalDispositivos ligados',
+                '$_dispositivosLigados de $_totalDispositivos ligados',
                 acao: 'Ver todos',
                 onAcao: () => _selecionarAba(1),
               ),
-
               const SizedBox(height: 14),
-
-              _gradeDispositivos(),
-
+              _gradeDispositivos(c),
               const SizedBox(height: 28),
-
-              _tituloSecao('Consumo de energia', 'Hoje'),
-
+              _tituloSecao(c, 'Consumo de energia', 'Hoje'),
               const SizedBox(height: 14),
-
-              _cartaoEnergia(),
-
+              _cartaoEnergia(c),
               const SizedBox(height: 28),
-
               _tituloSecao(
+                c,
                 'Ambientes',
                 '${_ambientes.length} ambientes',
                 acao: 'Gerenciar',
                 onAcao: _gerenciarAmbientes,
               ),
-
               const SizedBox(height: 14),
-
-              _gradeAmbientes(),
-
+              _gradeAmbientes(c),
               const SizedBox(height: 28),
-
               _tituloSecao(
+                c,
                 'Atalhos',
                 'Suas rotinas',
                 acao: '＋ Criar',
                 onAcao: _novoAtalho,
               ),
-
               const SizedBox(height: 14),
-
-              _gradeAtalhos(),
-
+              _gradeAtalhos(c),
               const SizedBox(height: 24),
-
-              const Center(
+              Center(
                 child: Text(
                   'COS  •  CONTROLE DA SUA CASA',
                   style: TextStyle(
-                    color: _muted,
+                    color: c.muted,
                     fontSize: 10,
                     letterSpacing: 1.5,
                   ),
@@ -1125,11 +897,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  // =====================================================
-  // CABEÇALHO ORIGINAL COM MENU COMPACTO
-  // =====================================================
-
-  Widget _cabecalho() {
+  Widget _cabecalho(CosColors c) {
     return CosAppHeader(
       title: 'Início',
       subtitle: 'CASA INTELIGENTE',
@@ -1139,26 +907,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
           IconButton(
             tooltip: 'Alertas',
             onPressed: () => _selecionarAba(3),
-            icon: const Icon(Icons.notifications_none_rounded, color: _fg),
+            icon: Icon(Icons.notifications_none_rounded, color: c.fg),
           ),
-
           PopupMenuButton<String>(
             tooltip: 'Perfil',
             position: PopupMenuPosition.under,
             offset: const Offset(0, 4),
-
             constraints: const BoxConstraints(minWidth: 190, maxWidth: 220),
-
-            color: _panel2,
+            color: c.panel2,
             elevation: 8,
-
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
-              side: const BorderSide(color: _border),
+              side: BorderSide(color: c.border),
             ),
-
-            icon: const Icon(Icons.person_outline_rounded, color: _fg),
-
+            icon: Icon(Icons.person_outline_rounded, color: c.fg),
             onSelected: (opcao) {
               if (opcao == 'perfil') {
                 _selecionarAba(4);
@@ -1166,27 +928,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 _confirmarLogout();
               }
             },
-
-            itemBuilder: (context) => const [
+            itemBuilder: (context) => [
               PopupMenuItem<String>(
                 value: 'perfil',
                 height: 44,
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.settings_outlined, color: _mint, size: 18),
-                    SizedBox(width: 10),
+                    Icon(Icons.settings_outlined, color: c.mint, size: 18),
+                    const SizedBox(width: 10),
                     Text(
                       'Configurações do perfil',
-                      style: TextStyle(color: _fg, fontSize: 12),
+                      style: TextStyle(color: c.fg, fontSize: 12),
                     ),
                   ],
                 ),
               ),
-
-              PopupMenuDivider(height: 1),
-
-              PopupMenuItem<String>(
+              const PopupMenuDivider(height: 1),
+              const PopupMenuItem<String>(
                 value: 'logout',
                 height: 44,
                 child: Row(
@@ -1212,13 +971,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  // =====================================================
-  // SAUDAÇÃO ORIGINAL
-  // =====================================================
-
-  Widget _saudacao() {
+  Widget _saudacao(CosColors c) {
     final nome = FirebaseService.usuarioAtual?.displayName?.trim();
-
     final primeiroNome = nome == null || nome.isEmpty
         ? 'seja bem-vindo'
         : nome.split(' ').first;
@@ -1226,59 +980,55 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Seu espaço, suas regras.',
-          style: TextStyle(color: _muted, fontSize: 13),
+          style: TextStyle(color: c.muted, fontSize: 13),
         ),
         const SizedBox(height: 7),
         Text(
           'Olá, $primeiroNome!',
-          style: const TextStyle(
-            color: _fg,
+          style: TextStyle(
+            color: c.fg,
             fontSize: 25,
             fontWeight: FontWeight.w800,
             letterSpacing: -0.5,
           ),
         ),
         const SizedBox(height: 7),
-        const Text(
+        Text(
           'Veja o que está acontecendo na sua casa.',
-          style: TextStyle(color: _muted, fontSize: 13),
+          style: TextStyle(color: c.muted, fontSize: 13),
         ),
       ],
     );
   }
 
-  // =====================================================
-  // CARTÃO ORIGINAL DE TEMPERATURA DA CASA
-  // =====================================================
-
-  Widget _cartaoClima() {
+  Widget _cartaoClima(CosColors c) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF163B3B), _panel],
+        gradient: LinearGradient(
+          colors: [c.mint.withValues(alpha: 0.18), c.panel],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: _mint.withValues(alpha: 0.18)),
+        border: Border.all(color: c.mint.withValues(alpha: 0.18)),
       ),
       child: Row(
         children: [
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
-                    Icon(Icons.wb_sunny_outlined, color: _mint, size: 18),
-                    SizedBox(width: 7),
+                    Icon(Icons.wb_sunny_outlined, color: c.mint, size: 18),
+                    const SizedBox(width: 7),
                     Text(
                       'AMBIENTE DA CASA',
                       style: TextStyle(
-                        color: _mint,
+                        color: c.mint,
                         fontSize: 10,
                         fontWeight: FontWeight.w800,
                         letterSpacing: 1.1,
@@ -1286,62 +1036,53 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                   ],
                 ),
-
-                SizedBox(height: 12),
-
+                const SizedBox(height: 12),
                 Text(
                   '—',
                   style: TextStyle(
-                    color: _fg,
+                    color: c.fg,
                     fontSize: 34,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
-
-                SizedBox(height: 4),
-
+                const SizedBox(height: 4),
                 Text(
                   'Nenhuma leitura de temperatura',
-                  style: TextStyle(color: _muted, fontSize: 12),
+                  style: TextStyle(color: c.muted, fontSize: 12),
                 ),
               ],
             ),
           ),
-
           Container(
             width: 72,
             height: 72,
             decoration: BoxDecoration(
-              color: _mint.withValues(alpha: 0.10),
+              color: c.mint.withValues(alpha: 0.10),
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.thermostat_rounded, color: _mint, size: 42),
+            child: Icon(Icons.thermostat_rounded, color: c.mint, size: 42),
           ),
         ],
       ),
     );
   }
 
-  // =====================================================
-  // INDICADORES ORIGINAIS
-  // =====================================================
-
-  Widget _resumoDispositivos() {
+  Widget _resumoDispositivos(CosColors c) {
     return Row(
       children: [
         Expanded(
           child: _cartaoResumo(
+            c,
             icone: Icons.power_settings_new_rounded,
             titulo: 'Dispositivos',
             valor: '$_dispositivosLigados/$_totalDispositivos',
             descricao: 'em funcionamento',
           ),
         ),
-
         const SizedBox(width: 12),
-
         Expanded(
           child: _cartaoResumo(
+            c,
             icone: Icons.bolt_rounded,
             titulo: 'Energia hoje',
             valor: '—',
@@ -1352,7 +1093,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _cartaoResumo({
+  Widget _cartaoResumo(
+    CosColors c, {
     required IconData icone,
     required String titulo,
     required String valor,
@@ -1361,37 +1103,34 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: _panel,
+        color: c.panel,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: _border),
+        border: Border.all(color: c.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icone, color: _mint, size: 21),
+          Icon(icone, color: c.mint, size: 21),
           const SizedBox(height: 14),
-          Text(titulo, style: const TextStyle(color: _muted, fontSize: 11)),
+          Text(titulo, style: TextStyle(color: c.muted, fontSize: 11)),
           const SizedBox(height: 5),
           Text(
             valor,
-            style: const TextStyle(
-              color: _fg,
+            style: TextStyle(
+              color: c.fg,
               fontSize: 23,
               fontWeight: FontWeight.w800,
             ),
           ),
           const SizedBox(height: 4),
-          Text(descricao, style: const TextStyle(color: _muted, fontSize: 10)),
+          Text(descricao, style: TextStyle(color: c.muted, fontSize: 10)),
         ],
       ),
     );
   }
 
-  // =====================================================
-  // TÍTULOS
-  // =====================================================
-
   Widget _tituloSecao(
+    CosColors c,
     String titulo,
     String subtitulo, {
     String? acao,
@@ -1405,24 +1144,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
             children: [
               Text(
                 titulo,
-                style: const TextStyle(
-                  color: _fg,
+                style: TextStyle(
+                  color: c.fg,
                   fontSize: 18,
                   fontWeight: FontWeight.w800,
                 ),
               ),
               const SizedBox(height: 5),
-              Text(
-                subtitulo,
-                style: const TextStyle(color: _muted, fontSize: 11),
-              ),
+              Text(subtitulo, style: TextStyle(color: c.muted, fontSize: 11)),
             ],
           ),
         ),
         if (acao != null)
           TextButton(
             onPressed: onAcao,
-            style: TextButton.styleFrom(foregroundColor: _mint),
+            style: TextButton.styleFrom(foregroundColor: c.mint),
             child: Text(
               acao,
               style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
@@ -1432,14 +1168,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  // =====================================================
-  // GRADE DE DISPOSITIVOS
-  // =====================================================
-
-  Widget _gradeDispositivos() {
-    if (_dispositivos.isEmpty) {
-      return _estadoVazioDispositivos();
-    }
+  Widget _gradeDispositivos(CosColors c) {
+    if (_dispositivos.isEmpty) return _estadoVazioDispositivos(c);
 
     return GridView.builder(
       itemCount: _dispositivos.length,
@@ -1453,55 +1183,53 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ),
       itemBuilder: (context, index) {
         final d = _dispositivos[index];
-
         return _DispositivoCard(
+          c: c,
           nome: d.nome,
           ambiente: _ambienteDe(d),
           icone: _iconeDe(d),
           ligado: d.ligado,
-          onChanged: (valor) {
-            _alterarEstado(d, valor);
-          },
+          onChanged: (valor) => _alterarEstado(d, valor),
         );
       },
     );
   }
 
-  Widget _estadoVazioDispositivos() {
+  Widget _estadoVazioDispositivos(CosColors c) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(28),
       decoration: BoxDecoration(
-        color: _panel,
+        color: c.panel,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: _border),
+        border: Border.all(color: c.border),
       ),
       child: Column(
         children: [
-          const Icon(Icons.devices_other_rounded, color: _mint, size: 48),
+          Icon(Icons.devices_other_rounded, color: c.mint, size: 48),
           const SizedBox(height: 15),
-          const Text(
+          Text(
             'Nenhum dispositivo cadastrado',
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: _fg,
+              color: c.fg,
               fontSize: 16,
               fontWeight: FontWeight.w700,
             ),
           ),
           const SizedBox(height: 8),
-          const Text(
+          Text(
             'Sua casa ainda não possui dispositivos.\n'
             'Adicione seu primeiro dispositivo!',
             textAlign: TextAlign.center,
-            style: TextStyle(color: _muted, fontSize: 12),
+            style: TextStyle(color: c.muted, fontSize: 12),
           ),
           const SizedBox(height: 20),
           ElevatedButton.icon(
             onPressed: () => _selecionarAba(1),
             style: ElevatedButton.styleFrom(
-              backgroundColor: _mint,
-              foregroundColor: _bg,
+              backgroundColor: c.mint,
+              foregroundColor: c.bg,
             ),
             icon: const Icon(Icons.add),
             label: const Text('Adicionar dispositivo'),
@@ -1511,20 +1239,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  // =====================================================
-  // CARTÃO DE ENERGIA ORIGINAL
-  // =====================================================
-
-  Widget _cartaoEnergia() {
+  Widget _cartaoEnergia(CosColors c) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: _panel,
+        color: c.panel,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: _border),
+        border: Border.all(color: c.border),
       ),
-      child: const Column(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
@@ -1533,25 +1257,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 child: Text(
                   'Consumo semanal',
                   style: TextStyle(
-                    color: _fg,
+                    color: c.fg,
                     fontSize: 17,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
               ),
-              Icon(Icons.bar_chart_rounded, color: _mint, size: 26),
+              Icon(Icons.bar_chart_rounded, color: c.mint, size: 26),
             ],
           ),
-          SizedBox(height: 20),
+          const SizedBox(height: 20),
           Center(
             child: Column(
               children: [
-                Icon(Icons.bolt_outlined, color: _muted, size: 38),
-                SizedBox(height: 10),
+                Icon(Icons.bolt_outlined, color: c.muted, size: 38),
+                const SizedBox(height: 10),
                 Text(
                   'Nenhum dado de consumo disponível',
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: _muted, fontSize: 12),
+                  style: TextStyle(color: c.muted, fontSize: 12),
                 ),
               ],
             ),
@@ -1561,17 +1285,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  // =====================================================
-  // GRADE DE AMBIENTES
-  // =====================================================
-
-  Widget _gradeAmbientes() {
+  Widget _gradeAmbientes(CosColors c) {
     if (_ambientes.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 20),
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 20),
         child: Text(
           'Nenhum ambiente cadastrado.',
-          style: TextStyle(color: _muted),
+          style: TextStyle(color: c.muted),
         ),
       );
     }
@@ -1588,13 +1308,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ),
       itemBuilder: (context, index) {
         final ambiente = _ambientes[index];
-
         return Container(
           padding: const EdgeInsets.all(15),
           decoration: BoxDecoration(
-            color: _panel,
+            color: c.panel,
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: _border),
+            border: Border.all(color: c.border),
           ),
           child: Row(
             children: [
@@ -1602,10 +1321,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 width: 42,
                 height: 42,
                 decoration: BoxDecoration(
-                  color: _panel2,
+                  color: c.panelElevated,
                   borderRadius: BorderRadius.circular(13),
                 ),
-                child: Icon(ambiente.icone, color: _mint, size: 22),
+                child: Icon(ambiente.icone, color: c.mint, size: 22),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -1617,19 +1336,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ambiente.nome,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: _fg,
+                      style: TextStyle(
+                        color: c.fg,
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
                     const SizedBox(height: 5),
                     Text(
-                      '${_quantidadeNoAmbiente(ambiente.nome)} '
-                      'dispositivos',
+                      '${_quantidadeNoAmbiente(ambiente.nome)} dispositivos',
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: _muted, fontSize: 9),
+                      style: TextStyle(color: c.muted, fontSize: 9),
                     ),
                   ],
                 ),
@@ -1641,18 +1359,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  // =====================================================
-  // GRADE DE ATALHOS
-  // =====================================================
-
-  Widget _gradeAtalhos() {
+  Widget _gradeAtalhos(CosColors c) {
     if (_atalhos.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 12),
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
         child: Text(
-          'Nenhum modo criado. '
-          'Toque em “＋ Criar” para adicionar um.',
-          style: TextStyle(color: _muted),
+          'Nenhum modo criado. Toque em “＋ Criar” para adicionar um.',
+          style: TextStyle(color: c.muted),
         ),
       );
     }
@@ -1660,7 +1373,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final largura = (constraints.maxWidth - 12) / 2;
-
         return Wrap(
           spacing: 12,
           runSpacing: 12,
@@ -1669,6 +1381,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               SizedBox(
                 width: largura,
                 child: _AtalhoCard(
+                  c: c,
                   nome: atalho.nome,
                   quantidade: atalho.configuracoes.length,
                   onExecutar: () => _ativarAtalho(atalho),
@@ -1683,33 +1396,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 }
 
-// =====================================================
-// MODELO DE AMBIENTE
-// =====================================================
-
 class _Ambiente {
   String nome;
   final IconData icone;
-
   _Ambiente({required this.nome, required this.icone});
 }
-
-// =====================================================
-// MODELO DE ATALHO
-// =====================================================
 
 class _Atalho {
   final String nome;
   final Map<String, bool> configuracoes;
-
   _Atalho({required this.nome, required this.configuracoes});
 }
 
-// =====================================================
-// CARD DE DISPOSITIVO
-// =====================================================
-
 class _DispositivoCard extends StatelessWidget {
+  final CosColors c;
   final String nome;
   final String ambiente;
   final IconData icone;
@@ -1717,6 +1417,7 @@ class _DispositivoCard extends StatelessWidget {
   final ValueChanged<bool> onChanged;
 
   const _DispositivoCard({
+    required this.c,
     required this.nome,
     required this.ambiente,
     required this.icone,
@@ -1729,10 +1430,10 @@ class _DispositivoCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
-        color: _panel,
+        color: c.panel,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: ligado ? _mint.withValues(alpha: 0.38) : _border,
+          color: ligado ? c.mint.withValues(alpha: 0.38) : c.border,
         ),
       ),
       child: Column(
@@ -1744,17 +1445,17 @@ class _DispositivoCard extends StatelessWidget {
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: ligado ? _mint.withValues(alpha: 0.12) : _panel2,
+                  color: ligado ? c.mint.withValues(alpha: 0.12) : c.panel2,
                   borderRadius: BorderRadius.circular(13),
                 ),
-                child: Icon(icone, color: ligado ? _mint : _muted, size: 22),
+                child: Icon(icone, color: ligado ? c.mint : c.muted, size: 22),
               ),
               const Spacer(),
               Switch.adaptive(
                 value: ligado,
                 onChanged: onChanged,
-                activeThumbColor: _mint,
-                activeTrackColor: _mint.withValues(alpha: 0.35),
+                activeThumbColor: c.mint,
+                activeTrackColor: c.mint.withValues(alpha: 0.35),
               ),
             ],
           ),
@@ -1763,8 +1464,8 @@ class _DispositivoCard extends StatelessWidget {
             nome,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: _fg,
+            style: TextStyle(
+              color: c.fg,
               fontSize: 12,
               fontWeight: FontWeight.w700,
             ),
@@ -1774,12 +1475,12 @@ class _DispositivoCard extends StatelessWidget {
             ambiente,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(color: _muted, fontSize: 10),
+            style: TextStyle(color: c.muted, fontSize: 10),
           ),
           const SizedBox(height: 4),
           Text(
             ligado ? '● Ligado' : '● Desligado',
-            style: TextStyle(color: ligado ? _mint : _muted, fontSize: 10),
+            style: TextStyle(color: ligado ? c.mint : c.muted, fontSize: 10),
           ),
         ],
       ),
@@ -1787,11 +1488,8 @@ class _DispositivoCard extends StatelessWidget {
   }
 }
 
-// =====================================================
-// CARD DE ATALHO
-// =====================================================
-
 class _AtalhoCard extends StatelessWidget {
+  final CosColors c;
   final String nome;
   final int quantidade;
   final VoidCallback onExecutar;
@@ -1799,6 +1497,7 @@ class _AtalhoCard extends StatelessWidget {
   final VoidCallback onExcluir;
 
   const _AtalhoCard({
+    required this.c,
     required this.nome,
     required this.quantidade,
     required this.onExecutar,
@@ -1814,26 +1513,23 @@ class _AtalhoCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(15),
         decoration: BoxDecoration(
-          color: _panel,
+          color: c.panel,
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: _border),
+          border: Border.all(color: c.border),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                const Icon(Icons.auto_awesome_rounded, color: _mint, size: 22),
+                Icon(Icons.auto_awesome_rounded, color: c.mint, size: 22),
                 const Spacer(),
                 PopupMenuButton<String>(
                   tooltip: 'Opções do modo',
-                  icon: const Icon(Icons.more_vert, color: _muted, size: 20),
+                  icon: Icon(Icons.more_vert, color: c.muted, size: 20),
                   onSelected: (opcao) {
-                    if (opcao == 'editar') {
-                      onEditar();
-                    } else if (opcao == 'excluir') {
-                      onExcluir();
-                    }
+                    if (opcao == 'editar') onEditar();
+                    if (opcao == 'excluir') onExcluir();
                   },
                   itemBuilder: (context) => const [
                     PopupMenuItem<String>(
@@ -1853,8 +1549,8 @@ class _AtalhoCard extends StatelessWidget {
               nome,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: _fg,
+              style: TextStyle(
+                color: c.fg,
                 fontSize: 13,
                 fontWeight: FontWeight.w800,
               ),
@@ -1862,7 +1558,7 @@ class _AtalhoCard extends StatelessWidget {
             const SizedBox(height: 5),
             Text(
               '$quantidade dispositivos',
-              style: const TextStyle(color: _muted, fontSize: 10),
+              style: TextStyle(color: c.muted, fontSize: 10),
             ),
           ],
         ),

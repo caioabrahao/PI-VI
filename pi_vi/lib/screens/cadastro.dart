@@ -1,18 +1,10 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-
 import 'package:firebase_auth/firebase_auth.dart';
 
 import '../services/firebase_service.dart';
+import '../theme.dart';
 import 'login.dart';
-
-const Color bg = Color(0xFF080B0F);
-const Color panel = Color(0xFF10151B);
-const Color panel2 = Color(0xFF171E26);
-const Color border = Color(0xFF293640);
-const Color muted = Color(0xFF8A98A5);
-const Color fg = Color(0xFFF1F5F8);
-const Color mint = Color(0xFF4FE0C0);
 
 class CadastroScreen extends StatefulWidget {
   const CadastroScreen({super.key});
@@ -65,10 +57,7 @@ class _CadastroScreenState extends State<CadastroScreen> {
   }
 
   Future<void> criarConta() async {
-    if (!form.currentState!.validate()) {
-      return;
-    }
-
+    if (!form.currentState!.validate()) return;
     if (!aceitou) {
       mensagem('Aceite os termos para continuar.');
       return;
@@ -83,29 +72,26 @@ class _CadastroScreenState extends State<CadastroScreen> {
         senha: senha.text,
       );
 
-      if (!mounted) {
-        return;
-      }
+      if (!mounted) return;
 
+      final c = CosColors.of(context);
       await showDialog(
         context: context,
         barrierDismissible: false,
         builder: (ctx) => AlertDialog(
-          backgroundColor: panel2,
-          title: const Text(
-            'Confirme o seu e-mail',
-            style: TextStyle(color: fg),
-          ),
+          backgroundColor: c.panel2,
+          title: Text('Confirme o seu e-mail', style: TextStyle(color: c.fg)),
           content: Text(
-            'Enviamos um link de confirmação para ${email.text}. Acesse a sua caixa de entrada e clique no link para ativar a sua conta.',
-            style: const TextStyle(color: muted, fontSize: 13),
+            'Enviamos um link de confirmação para ${email.text}. '
+            'Acesse a sua caixa de entrada e clique no link para ativar a sua conta.',
+            style: TextStyle(color: c.muted, fontSize: 13),
           ),
           actions: [
             ElevatedButton(
               onPressed: () => Navigator.pop(ctx),
               style: ElevatedButton.styleFrom(
-                backgroundColor: mint,
-                foregroundColor: bg,
+                backgroundColor: c.mint,
+                foregroundColor: c.bg,
               ),
               child: const Text('OK, ir para o login'),
             ),
@@ -113,10 +99,7 @@ class _CadastroScreenState extends State<CadastroScreen> {
         ),
       );
 
-      if (!mounted) {
-        return;
-      }
-
+      if (!mounted) return;
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const LoginScreen()),
@@ -124,16 +107,44 @@ class _CadastroScreenState extends State<CadastroScreen> {
     } catch (e) {
       mensagem(erroCadastro(e));
     } finally {
-      if (mounted) {
-        setState(() => carregando = false);
-      }
+      if (mounted) setState(() => carregando = false);
     }
+  }
+
+  InputDecoration _campo(
+    CosColors c,
+    String dica, {
+    IconData? icone,
+    Widget? sufixo,
+  }) {
+    return InputDecoration(
+      hintText: dica,
+      hintStyle: TextStyle(color: c.muted),
+      prefixIcon: icone == null ? null : Icon(icone, color: c.muted, size: 19),
+      suffixIcon: sufixo,
+      filled: true,
+      fillColor: c.panel,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: c.border),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: c.border),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: c.mint),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final c = CosColors.of(context);
+
     return Scaffold(
-      backgroundColor: bg,
+      backgroundColor: c.bg,
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, box) => SingleChildScrollView(
@@ -151,16 +162,16 @@ class _CadastroScreenState extends State<CadastroScreen> {
                           onPressed: () => Navigator.maybePop(context),
                           icon: const Icon(Icons.chevron_left),
                           style: IconButton.styleFrom(
-                            backgroundColor: panel2,
-                            foregroundColor: fg,
+                            backgroundColor: c.panel2,
+                            foregroundColor: c.fg,
                           ),
                         ),
                         const SizedBox(width: 12),
-                        const Expanded(
+                        Expanded(
                           child: Text(
                             'Criar conta',
                             style: TextStyle(
-                              color: fg,
+                              color: c.fg,
                               fontSize: 18,
                               fontWeight: FontWeight.w700,
                             ),
@@ -170,28 +181,38 @@ class _CadastroScreenState extends State<CadastroScreen> {
                       ],
                     ),
                     const SizedBox(height: 24),
-                    const Text(
+                    Text(
                       'Bem-vindo ao COS.',
                       style: TextStyle(
-                        color: fg,
+                        color: c.fg,
                         fontSize: 28,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
                     const SizedBox(height: 7),
-                    const Text(
+                    Text(
                       'Comece pela sua conta. A casa vem logo depois.',
-                      style: TextStyle(color: muted, fontSize: 12),
+                      style: TextStyle(color: c.muted, fontSize: 12),
                     ),
                     const SizedBox(height: 24),
-
-                    _label('Nome completo'),
+                    Text(
+                      'Nome completo',
+                      style: TextStyle(
+                        color: c.muted,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                     const SizedBox(height: 7),
-                    _campo(
-                      nome,
-                      Icons.person_outline,
-                      'Seu nome',
+                    TextFormField(
+                      controller: nome,
+                      style: TextStyle(color: c.fg, fontSize: 14),
                       autofillHints: const [AutofillHints.name],
+                      decoration: _campo(
+                        c,
+                        'Seu nome',
+                        icone: Icons.person_outline,
+                      ),
                       validator: (v) {
                         if (v == null || v.trim().isEmpty) {
                           return 'Informe seu nome.';
@@ -200,15 +221,25 @@ class _CadastroScreenState extends State<CadastroScreen> {
                       },
                     ),
                     const SizedBox(height: 14),
-
-                    _label('E-mail'),
+                    Text(
+                      'E-mail',
+                      style: TextStyle(
+                        color: c.muted,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                     const SizedBox(height: 7),
-                    _campo(
-                      email,
-                      Icons.mail_outline,
-                      'voce@exemplo.com',
-                      teclado: TextInputType.emailAddress,
+                    TextFormField(
+                      controller: email,
+                      style: TextStyle(color: c.fg, fontSize: 14),
+                      keyboardType: TextInputType.emailAddress,
                       autofillHints: const [AutofillHints.email],
+                      decoration: _campo(
+                        c,
+                        'voce@exemplo.com',
+                        icone: Icons.mail_outline,
+                      ),
                       validator: (v) {
                         if (v == null || !v.contains('@')) {
                           return 'Informe um e-mail válido.';
@@ -217,24 +248,33 @@ class _CadastroScreenState extends State<CadastroScreen> {
                       },
                     ),
                     const SizedBox(height: 14),
-
-                    _label('Senha'),
+                    Text(
+                      'Senha',
+                      style: TextStyle(
+                        color: c.muted,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                     const SizedBox(height: 7),
-                    _campo(
-                      senha,
-                      Icons.lock_outline,
-                      'Mínimo de 6 caracteres',
-                      ocultar: !mostrarSenha,
+                    TextFormField(
+                      controller: senha,
+                      style: TextStyle(color: c.fg, fontSize: 14),
+                      obscureText: !mostrarSenha,
                       autofillHints: const [AutofillHints.newPassword],
-                      sufixo: IconButton(
-                        onPressed: () {
-                          setState(() => mostrarSenha = !mostrarSenha);
-                        },
-                        icon: Icon(
-                          mostrarSenha
-                              ? Icons.visibility_outlined
-                              : Icons.visibility_off_outlined,
-                          color: muted,
+                      decoration: _campo(
+                        c,
+                        'Mínimo de 6 caracteres',
+                        icone: Icons.lock_outline,
+                        sufixo: IconButton(
+                          onPressed: () =>
+                              setState(() => mostrarSenha = !mostrarSenha),
+                          icon: Icon(
+                            mostrarSenha
+                                ? Icons.visibility_outlined
+                                : Icons.visibility_off_outlined,
+                            color: c.muted,
+                          ),
                         ),
                       ),
                       validator: (v) {
@@ -245,14 +285,24 @@ class _CadastroScreenState extends State<CadastroScreen> {
                       },
                     ),
                     const SizedBox(height: 14),
-
-                    _label('Confirmar senha'),
+                    Text(
+                      'Confirmar senha',
+                      style: TextStyle(
+                        color: c.muted,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                     const SizedBox(height: 7),
-                    _campo(
-                      confirmarSenha,
-                      Icons.lock_outline,
-                      'Digite a senha novamente',
-                      ocultar: !mostrarSenha,
+                    TextFormField(
+                      controller: confirmarSenha,
+                      style: TextStyle(color: c.fg, fontSize: 14),
+                      obscureText: !mostrarSenha,
+                      decoration: _campo(
+                        c,
+                        'Digite a senha novamente',
+                        icone: Icons.lock_outline,
+                      ),
                       validator: (v) {
                         if (v == null || v.isEmpty) {
                           return 'Confirme sua senha.';
@@ -264,33 +314,31 @@ class _CadastroScreenState extends State<CadastroScreen> {
                       },
                     ),
                     const SizedBox(height: 16),
-
                     CheckboxListTile(
                       contentPadding: EdgeInsets.zero,
                       value: aceitou,
                       onChanged: (v) => setState(() => aceitou = v ?? false),
-                      activeColor: mint,
-                      checkColor: bg,
+                      activeColor: c.mint,
+                      checkColor: c.bg,
                       controlAffinity: ListTileControlAffinity.leading,
-                      title: const Text(
+                      title: Text(
                         'Li e aceito os termos de uso e a política de privacidade.',
-                        style: TextStyle(color: muted, fontSize: 11),
+                        style: TextStyle(color: c.muted, fontSize: 11),
                       ),
                     ),
                     const SizedBox(height: 24),
-
                     SizedBox(
                       height: 52,
                       width: double.infinity,
                       child: ElevatedButton.icon(
                         onPressed: carregando ? null : criarConta,
                         icon: carregando
-                            ? const SizedBox(
+                            ? SizedBox(
                                 width: 18,
                                 height: 18,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
-                                  color: bg,
+                                  color: c.bg,
                                 ),
                               )
                             : const Icon(Icons.arrow_forward, size: 18),
@@ -299,8 +347,8 @@ class _CadastroScreenState extends State<CadastroScreen> {
                           style: const TextStyle(fontWeight: FontWeight.w800),
                         ),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: mint,
-                          foregroundColor: bg,
+                          backgroundColor: c.mint,
+                          foregroundColor: c.bg,
                           elevation: 0,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(13),
@@ -309,17 +357,16 @@ class _CadastroScreenState extends State<CadastroScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
-
                     Center(
                       child: Text.rich(
                         TextSpan(
                           text: 'Já tem conta? ',
-                          style: const TextStyle(color: muted, fontSize: 12),
+                          style: TextStyle(color: c.muted, fontSize: 12),
                           children: [
                             TextSpan(
                               text: 'Entrar',
-                              style: const TextStyle(
-                                color: mint,
+                              style: TextStyle(
+                                color: c.mint,
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
                               ),
@@ -345,55 +392,4 @@ class _CadastroScreenState extends State<CadastroScreen> {
       ),
     );
   }
-}
-
-Widget _label(String texto) {
-  return Text(
-    texto,
-    style: const TextStyle(
-      color: muted,
-      fontSize: 12,
-      fontWeight: FontWeight.w600,
-    ),
-  );
-}
-
-Widget _campo(
-  TextEditingController controller,
-  IconData icone,
-  String dica, {
-  bool ocultar = false,
-  Widget? sufixo,
-  TextInputType? teclado,
-  Iterable<String>? autofillHints,
-  String? Function(String?)? validator,
-}) {
-  return TextFormField(
-    controller: controller,
-    obscureText: ocultar,
-    keyboardType: teclado,
-    autofillHints: autofillHints,
-    validator: validator,
-    style: const TextStyle(color: fg, fontSize: 14),
-    decoration: InputDecoration(
-      hintText: dica,
-      hintStyle: const TextStyle(color: muted),
-      prefixIcon: Icon(icone, color: muted, size: 19),
-      suffixIcon: sufixo,
-      filled: true,
-      fillColor: panel,
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: border),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: border),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: mint),
-      ),
-    ),
-  );
 }

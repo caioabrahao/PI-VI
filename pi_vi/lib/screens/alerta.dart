@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/alerta.dart';
+import '../theme.dart';
 import '../widgets/cos_app_navigation.dart';
 
 const _red = Color(0xFFFF6077);
@@ -57,9 +58,10 @@ class _AlertasScreenState extends State<AlertasScreen> {
   }
 
   void _configuracoes() {
+    final c = CosColors.of(context);
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: cosPanel,
+      backgroundColor: c.panel,
       showDragHandle: true,
       isScrollControlled: true,
       builder: (_) => SafeArea(
@@ -71,28 +73,42 @@ class _AlertasScreenState extends State<AlertasScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Configurações de alertas', style: _heading),
+                Text(
+                  'Configurações de alertas',
+                  style: TextStyle(
+                    color: c.fg,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
                 const SizedBox(height: 16),
                 SwitchListTile.adaptive(
                   contentPadding: EdgeInsets.zero,
-                  activeThumbColor: cosMint,
-                  title: const Text('Somente não lidas', style: _title),
-                  subtitle: const Text(
+                  activeThumbColor: c.mint,
+                  title: Text(
+                    'Somente não lidas',
+                    style: TextStyle(
+                      color: c.fg,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  subtitle: Text(
                     'Ocultar notificações que você já leu.',
-                    style: _description,
+                    style: TextStyle(color: c.muted, fontSize: 12, height: 1.4),
                   ),
                   value: widget.data.somenteNaoLidas,
                   onChanged: (value) => widget.data.somenteNaoLidas = value,
                 ),
                 const SizedBox(height: 16),
-                const Text(
+                Text(
                   'Central de notificações do aplicativo.',
-                  style: _description,
+                  style: TextStyle(color: c.muted, fontSize: 12, height: 1.4),
                 ),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'As leituras e preferências são mantidas durante esta sessão.',
-                  style: _description,
+                  style: TextStyle(color: c.muted, fontSize: 12, height: 1.4),
                 ),
               ],
             ),
@@ -103,6 +119,7 @@ class _AlertasScreenState extends State<AlertasScreen> {
   }
 
   void _abrirAlerta(Alerta alerta) {
+    final c = CosColors.of(context);
     widget.data.marcarLida(alerta);
     final (destino, acao) = switch (alerta.tipo) {
       AlertaTipo.dispositivo ||
@@ -112,7 +129,7 @@ class _AlertasScreenState extends State<AlertasScreen> {
     };
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: cosPanel,
+      backgroundColor: c.panel,
       showDragHandle: true,
       isScrollControlled: true,
       builder: (sheetContext) => SafeArea(
@@ -124,23 +141,36 @@ class _AlertasScreenState extends State<AlertasScreen> {
             children: [
               _AlertaIcon(tipo: alerta.tipo),
               const SizedBox(height: 16),
-              Text(alerta.titulo, style: _heading),
+              Text(
+                alerta.titulo,
+                style: TextStyle(
+                  color: c.fg,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
               const SizedBox(height: 8),
-              Text(alerta.descricao, style: _description),
+              Text(
+                alerta.descricao,
+                style: TextStyle(color: c.muted, fontSize: 12, height: 1.4),
+              ),
               const SizedBox(height: 8),
-              Text(_horario(alerta, DateTime.now()), style: _description),
+              Text(
+                _horario(alerta, DateTime.now()),
+                style: TextStyle(color: c.muted, fontSize: 12, height: 1.4),
+              ),
               if (alerta.critico) ...[
                 const SizedBox(height: 16),
-                const Text(
+                Text(
                   'Verifique a alimentação e a conexão Wi-Fi do dispositivo.',
-                  style: _description,
+                  style: TextStyle(color: c.muted, fontSize: 12, height: 1.4),
                 ),
               ],
               const SizedBox(height: 24),
               FilledButton(
                 style: FilledButton.styleFrom(
-                  backgroundColor: cosMint,
-                  foregroundColor: cosBackground,
+                  backgroundColor: c.mint,
+                  foregroundColor: c.bg,
                 ),
                 onPressed: () {
                   Navigator.pop(sheetContext);
@@ -157,8 +187,10 @@ class _AlertasScreenState extends State<AlertasScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final c = CosColors.of(context);
+
     return Scaffold(
-      backgroundColor: cosBackground,
+      backgroundColor: c.bg,
       bottomNavigationBar: CosAppNavigation(
         selectedIndex: 3,
         onSelected: widget.onNavigate,
@@ -197,8 +229,8 @@ class _AlertasScreenState extends State<AlertasScreen> {
                       trailing: IconButton.filled(
                         tooltip: 'Configurações de alertas',
                         style: IconButton.styleFrom(
-                          backgroundColor: cosPanelElevated,
-                          foregroundColor: cosForeground,
+                          backgroundColor: c.panelElevated,
+                          foregroundColor: c.fg,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(16),
                           ),
@@ -214,15 +246,17 @@ class _AlertasScreenState extends State<AlertasScreen> {
                       runSpacing: 4,
                       children: [
                         _filtroChip(
+                          c,
                           _Filtro.todas,
                           'Todas · ${data.alertas.length}',
                         ),
                         _filtroChip(
+                          c,
                           _Filtro.criticas,
                           'Críticas · ${data.criticas}',
                         ),
-                        _filtroChip(_Filtro.dispositivos, 'Dispositivos'),
-                        _filtroChip(_Filtro.energia, 'Energia'),
+                        _filtroChip(c, _Filtro.dispositivos, 'Dispositivos'),
+                        _filtroChip(c, _Filtro.energia, 'Energia'),
                       ],
                     ),
                     if (recomendada != null) ...[
@@ -250,14 +284,22 @@ class _AlertasScreenState extends State<AlertasScreen> {
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
-                                      const Text(
+                                      Text(
                                         'Ação recomendada',
-                                        style: _title,
+                                        style: TextStyle(
+                                          color: c.fg,
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w600,
+                                        ),
                                       ),
                                       const SizedBox(height: 3),
                                       Text(
                                         recomendada.descricao,
-                                        style: _description,
+                                        style: TextStyle(
+                                          color: c.muted,
+                                          fontSize: 12,
+                                          height: 1.4,
+                                        ),
                                       ),
                                     ],
                                   ),
@@ -274,21 +316,32 @@ class _AlertasScreenState extends State<AlertasScreen> {
                       ),
                     ],
                     if (grupos.isEmpty)
-                      const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 60),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 60),
                         child: Column(
                           children: [
                             Icon(
                               Icons.notifications_none_rounded,
-                              color: cosMint,
+                              color: c.mint,
                               size: 40,
                             ),
-                            SizedBox(height: 14),
-                            Text('Tudo em dia', style: _heading),
-                            SizedBox(height: 8),
+                            const SizedBox(height: 14),
+                            Text(
+                              'Tudo em dia',
+                              style: TextStyle(
+                                color: c.fg,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
                             Text(
                               'Nenhuma notificação neste filtro.',
-                              style: _description,
+                              style: TextStyle(
+                                color: c.muted,
+                                fontSize: 12,
+                                height: 1.4,
+                              ),
                             ),
                           ],
                         ),
@@ -301,15 +354,22 @@ class _AlertasScreenState extends State<AlertasScreen> {
                           crossAxisAlignment: WrapCrossAlignment.center,
                           spacing: 12,
                           children: [
-                            Text(grupo.key, style: _heading),
+                            Text(
+                              grupo.key,
+                              style: TextStyle(
+                                color: c.fg,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
                             if (grupo.key == grupos.keys.first)
                               TextButton(
                                 onPressed: data.naoLidas == 0
                                     ? null
                                     : data.marcarTodasLidas,
                                 style: TextButton.styleFrom(
-                                  foregroundColor: cosMint,
-                                  disabledForegroundColor: cosMuted,
+                                  foregroundColor: c.mint,
+                                  disabledForegroundColor: c.muted,
                                 ),
                                 child: const Text('Marcar como lidas'),
                               ),
@@ -319,7 +379,7 @@ class _AlertasScreenState extends State<AlertasScreen> {
                       for (final alerta in grupo.value)
                         Padding(
                           padding: const EdgeInsets.only(bottom: 10),
-                          child: _card(alerta, agora),
+                          child: _card(c, alerta, agora),
                         ),
                     ],
                   ],
@@ -332,19 +392,17 @@ class _AlertasScreenState extends State<AlertasScreen> {
     );
   }
 
-  Widget _filtroChip(_Filtro filtro, String label) {
+  Widget _filtroChip(CosColors c, _Filtro filtro, String label) {
     final critico = filtro == _Filtro.criticas;
     final selecionado = _filtro == filtro;
-    final cor = critico ? _red : cosMint;
+    final cor = critico ? _red : c.mint;
     return ChoiceChip(
       key: ValueKey('filtro-${filtro.name}'),
       label: Text(label),
       selected: selecionado,
       showCheckmark: false,
       onSelected: (_) => setState(() => _filtro = filtro),
-      backgroundColor: critico
-          ? _red.withValues(alpha: 0.18)
-          : cosPanelElevated,
+      backgroundColor: critico ? _red.withValues(alpha: 0.18) : c.panelElevated,
       selectedColor: cor.withValues(alpha: 0.2),
       side: BorderSide(
         color: selecionado ? cor.withValues(alpha: 0.5) : Colors.transparent,
@@ -352,22 +410,22 @@ class _AlertasScreenState extends State<AlertasScreen> {
       shape: const StadiumBorder(),
       visualDensity: VisualDensity.compact,
       labelStyle: TextStyle(
-        color: selecionado || critico ? cor : cosMuted,
+        color: selecionado || critico ? cor : c.muted,
         fontSize: 12,
         fontWeight: FontWeight.w600,
       ),
     );
   }
 
-  Widget _card(Alerta alerta, DateTime agora) {
+  Widget _card(CosColors c, Alerta alerta, DateTime agora) {
     final lida = widget.data.estaLida(alerta);
     return Semantics(
       label: lida ? 'Notificação lida' : 'Notificação não lida',
       child: Material(
-        color: cosPanel,
+        color: c.panel,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
-          side: const BorderSide(color: cosBorder),
+          side: BorderSide(color: c.border),
         ),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
@@ -384,13 +442,27 @@ class _AlertasScreenState extends State<AlertasScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(alerta.titulo, style: _title),
+                      Text(
+                        alerta.titulo,
+                        style: TextStyle(
+                          color: c.fg,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                       const SizedBox(height: 6),
-                      Text(alerta.descricao, style: _description),
+                      Text(
+                        alerta.descricao,
+                        style: TextStyle(
+                          color: c.muted,
+                          fontSize: 12,
+                          height: 1.4,
+                        ),
+                      ),
                       const SizedBox(height: 6),
                       Text(
                         _horario(alerta, agora),
-                        style: const TextStyle(color: cosMuted, fontSize: 11),
+                        style: TextStyle(color: c.muted, fontSize: 11),
                       ),
                     ],
                   ),
@@ -403,8 +475,8 @@ class _AlertasScreenState extends State<AlertasScreen> {
                       key: ValueKey('nao-lida-${alerta.id}'),
                       width: 8,
                       height: 8,
-                      decoration: const BoxDecoration(
-                        color: cosMint,
+                      decoration: BoxDecoration(
+                        color: c.mint,
                         shape: BoxShape.circle,
                       ),
                     ),
@@ -418,30 +490,19 @@ class _AlertasScreenState extends State<AlertasScreen> {
   }
 }
 
-const _heading = TextStyle(
-  color: cosForeground,
-  fontSize: 18,
-  fontWeight: FontWeight.w700,
-);
-const _title = TextStyle(
-  color: cosForeground,
-  fontSize: 14,
-  fontWeight: FontWeight.w600,
-);
-const _description = TextStyle(color: cosMuted, fontSize: 12, height: 1.4);
-
 class _AlertaIcon extends StatelessWidget {
   final AlertaTipo tipo;
   const _AlertaIcon({required this.tipo});
 
   @override
   Widget build(BuildContext context) {
+    final c = CosColors.of(context);
     final (icone, cor) = switch (tipo) {
       AlertaTipo.dispositivo => (Icons.wifi_off_rounded, _red),
       AlertaTipo.energia => (Icons.bolt_outlined, _amber),
-      AlertaTipo.rotina => (Icons.meeting_room_outlined, cosMint),
+      AlertaTipo.rotina => (Icons.meeting_room_outlined, c.mint),
       AlertaTipo.atualizacao => (Icons.sync_rounded, _blue),
-      AlertaTipo.membro => (Icons.person_add_alt_outlined, cosMint),
+      AlertaTipo.membro => (Icons.person_add_alt_outlined, c.mint),
     };
     return Container(
       width: 46,

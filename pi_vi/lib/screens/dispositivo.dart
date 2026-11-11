@@ -4,11 +4,8 @@ import 'package:flutter/material.dart';
 
 import '../models/dispositivo_iot.dart';
 import '../services/dispositivo_iot_service.dart';
+import '../theme.dart';
 import '../widgets/cos_app_navigation.dart';
-
-// =====================================================
-// MODELO UTILIZADO PELA DASHBOARD
-// =====================================================
 
 class DispositivoListaItem {
   final String? id;
@@ -27,10 +24,6 @@ class DispositivoListaItem {
     this.online = true,
   });
 }
-
-// =====================================================
-// TELA PRINCIPAL DOS DISPOSITIVOS
-// =====================================================
 
 class DispositivoScreen extends StatefulWidget {
   final List<DispositivoListaItem> dispositivos;
@@ -54,9 +47,7 @@ class DispositivoScreen extends StatefulWidget {
 
 class _DispositivoScreenState extends State<DispositivoScreen> {
   List<DispositivoIot> _dispositivos = [];
-
   StreamSubscription<List<DispositivoIot>>? _assinatura;
-
   final TextEditingController _buscaController = TextEditingController();
 
   String _busca = '';
@@ -65,18 +56,6 @@ class _DispositivoScreenState extends State<DispositivoScreen> {
   bool _carregando = true;
   bool _cadastrando = false;
   String? _erro;
-
-  static const Color _bg = Color(0xFF080B0F);
-  static const Color _panel = Color(0xFF10151B);
-  static const Color _panel2 = Color(0xFF171E26);
-  static const Color _border = Color(0xFF293640);
-  static const Color _mint = Color(0xFF4FE0C0);
-  static const Color _fg = Color(0xFFF1F5F8);
-  static const Color _muted = Color(0xFF8A98A5);
-
-  // =====================================================
-  // INICIALIZAÇÃO
-  // =====================================================
 
   @override
   void initState() {
@@ -89,7 +68,6 @@ class _DispositivoScreenState extends State<DispositivoScreen> {
       _assinatura = DispositivoIotService.observarDispositivos().listen(
         (dispositivos) {
           if (!mounted) return;
-
           setState(() {
             _dispositivos = dispositivos;
             _carregando = false;
@@ -98,7 +76,6 @@ class _DispositivoScreenState extends State<DispositivoScreen> {
         },
         onError: (Object erro) {
           if (!mounted) return;
-
           setState(() {
             _carregando = false;
             _erro = erro.toString();
@@ -118,67 +95,41 @@ class _DispositivoScreenState extends State<DispositivoScreen> {
     super.dispose();
   }
 
-  // =====================================================
-  // INFORMAÇÕES DOS DISPOSITIVOS
-  // =====================================================
-
   int get _totalDispositivos => _dispositivos.length;
-
   int get _dispositivosOnline =>
       _dispositivos.where((d) => d.statusConexao == 'conectado').length;
-
   int get _dispositivosLigados => _dispositivos.where((d) => d.ligado).length;
 
   String _ambiente(DispositivoIot d) {
     final nome = d.ambienteId?.trim();
-
-    if (nome == null || nome.isEmpty) {
-      return 'Sem ambiente';
-    }
-
+    if (nome == null || nome.isEmpty) return 'Sem ambiente';
     return nome;
   }
 
   IconData _iconeDispositivo(DispositivoIot d) {
     final tipo = d.tipo.toLowerCase();
-
     if (tipo.contains('luz') ||
         tipo.contains('lampada') ||
         tipo.contains('lâmpada')) {
       return Icons.lightbulb_outline_rounded;
     }
-
-    if (tipo.contains('tomada')) {
-      return Icons.power_rounded;
-    }
-
+    if (tipo.contains('tomada')) return Icons.power_rounded;
     if (tipo.contains('ar-condicionado') || tipo.contains('clima')) {
       return Icons.ac_unit_rounded;
     }
-
-    if (tipo.contains('tv') || tipo.contains('televisão')) {
+    if (tipo.contains('tv') || tipo.contains('televisão'))
       return Icons.tv_rounded;
-    }
-
-    if (tipo.contains('ventilador')) {
-      return Icons.air_rounded;
-    }
-
+    if (tipo.contains('ventilador')) return Icons.air_rounded;
     return Icons.devices_other_rounded;
   }
 
   bool _ehIluminacao(DispositivoIot d) {
     final tipo = d.tipo.toLowerCase();
-
     return tipo.contains('lampada') ||
         tipo.contains('lâmpada') ||
         tipo.contains('luz') ||
         d.nome.toLowerCase().contains('luz');
   }
-
-  // =====================================================
-  // FILTROS
-  // =====================================================
 
   List<String> get _filtros {
     final ambientes =
@@ -188,7 +139,6 @@ class _DispositivoScreenState extends State<DispositivoScreen> {
             .toSet()
             .toList()
           ..sort();
-
     return ['Todos', 'Online', 'Offline', 'Iluminação', ...ambientes];
   }
 
@@ -203,24 +153,19 @@ class _DispositivoScreenState extends State<DispositivoScreen> {
           dispositivo.tipo.toLowerCase().contains(busca);
 
       bool correspondeFiltro;
-
       switch (_filtro) {
         case 'Todos':
           correspondeFiltro = true;
           break;
-
         case 'Online':
           correspondeFiltro = dispositivo.statusConexao == 'conectado';
           break;
-
         case 'Offline':
           correspondeFiltro = dispositivo.statusConexao == 'desconectado';
           break;
-
         case 'Iluminação':
           correspondeFiltro = _ehIluminacao(dispositivo);
           break;
-
         default:
           correspondeFiltro = _ambiente(dispositivo) == _filtro;
       }
@@ -236,10 +181,6 @@ class _DispositivoScreenState extends State<DispositivoScreen> {
 
     return resultado;
   }
-
-  // =====================================================
-  // CADASTRAR NOVO DISPOSITIVO
-  // =====================================================
 
   Future<void> _adicionarDispositivo() async {
     if (_cadastrando) return;
@@ -262,28 +203,19 @@ class _DispositivoScreenState extends State<DispositivoScreen> {
 
     try {
       await widget.onAddDevice(item);
-
       if (!mounted) return;
-
       setState(() {
         _filtro = 'Todos';
         _busca = '';
         _buscaController.clear();
       });
-
       _mensagem('Dispositivo cadastrado com sucesso!');
     } catch (e) {
       _mensagem('Erro ao cadastrar dispositivo: $e');
     } finally {
-      if (mounted) {
-        setState(() => _cadastrando = false);
-      }
+      if (mounted) setState(() => _cadastrando = false);
     }
   }
-
-  // =====================================================
-  // LIGAR / DESLIGAR
-  // =====================================================
 
   Future<void> _alterarEstado(DispositivoIot dispositivo, bool ligado) async {
     try {
@@ -296,19 +228,17 @@ class _DispositivoScreenState extends State<DispositivoScreen> {
     }
   }
 
-  // =====================================================
-  // EXCLUIR DISPOSITIVO
-  // =====================================================
-
   Future<void> _excluirDispositivo(DispositivoIot dispositivo) async {
+    final c = CosColors.of(context);
+
     final confirmar = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        backgroundColor: _panel,
-        title: const Text('Excluir dispositivo?', style: TextStyle(color: _fg)),
+        backgroundColor: c.panel,
+        title: Text('Excluir dispositivo?', style: TextStyle(color: c.fg)),
         content: Text(
           'Deseja excluir "${dispositivo.nome}" da sua casa?',
-          style: const TextStyle(color: _muted),
+          style: TextStyle(color: c.muted),
         ),
         actions: [
           TextButton(
@@ -330,28 +260,21 @@ class _DispositivoScreenState extends State<DispositivoScreen> {
 
     try {
       await DispositivoIotService.excluir(dispositivo.id);
-
       _mensagem('Dispositivo excluído com sucesso!');
     } catch (e) {
       _mensagem('Erro ao excluir dispositivo: $e');
     }
   }
 
-  // =====================================================
-  // EDITAR DISPOSITIVO
-  // =====================================================
-
   Future<void> _editarDispositivo(DispositivoIot dispositivo) async {
+    final c = CosColors.of(context);
     final nomeController = TextEditingController(text: dispositivo.nome);
-
     final identificadorController = TextEditingController(
       text: dispositivo.identificador,
     );
-
     final tipoController = TextEditingController(text: dispositivo.tipo);
 
     String ambienteSelecionado = _ambiente(dispositivo);
-
     final ambientes = [
       ...widget.ambientes,
       'Sem ambiente',
@@ -364,24 +287,21 @@ class _DispositivoScreenState extends State<DispositivoScreen> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
-              backgroundColor: _panel,
-              title: const Text(
-                'Editar dispositivo',
-                style: TextStyle(color: _fg),
-              ),
+              backgroundColor: c.panel,
+              title: Text('Editar dispositivo', style: TextStyle(color: c.fg)),
               content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     TextField(
                       controller: nomeController,
-                      style: const TextStyle(color: _fg),
+                      style: TextStyle(color: c.fg),
                       decoration: const InputDecoration(labelText: 'Nome'),
                     ),
                     const SizedBox(height: 12),
                     TextField(
                       controller: identificadorController,
-                      style: const TextStyle(color: _fg),
+                      style: TextStyle(color: c.fg),
                       decoration: const InputDecoration(
                         labelText: 'Identificador',
                       ),
@@ -389,13 +309,13 @@ class _DispositivoScreenState extends State<DispositivoScreen> {
                     const SizedBox(height: 12),
                     TextField(
                       controller: tipoController,
-                      style: const TextStyle(color: _fg),
+                      style: TextStyle(color: c.fg),
                       decoration: const InputDecoration(labelText: 'Tipo'),
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
                       initialValue: ambienteSelecionado,
-                      dropdownColor: _panel2,
+                      dropdownColor: c.panel2,
                       decoration: const InputDecoration(labelText: 'Ambiente'),
                       items: ambientes.map((ambiente) {
                         return DropdownMenuItem(
@@ -405,9 +325,7 @@ class _DispositivoScreenState extends State<DispositivoScreen> {
                       }).toList(),
                       onChanged: (valor) {
                         if (valor != null) {
-                          setDialogState(() {
-                            ambienteSelecionado = valor;
-                          });
+                          setDialogState(() => ambienteSelecionado = valor);
                         }
                       },
                     ),
@@ -450,39 +368,31 @@ class _DispositivoScreenState extends State<DispositivoScreen> {
             ? null
             : ambienteSelecionado,
       );
-
       _mensagem('Dispositivo atualizado!');
     } catch (e) {
       _mensagem('Erro ao atualizar dispositivo: $e');
     }
   }
 
-  // =====================================================
-  // MENSAGENS
-  // =====================================================
-
   void _mensagem(String texto) {
     if (!mounted) return;
-
+    final c = CosColors.of(context);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(texto),
-        backgroundColor: _panel2,
+        backgroundColor: c.panel2,
         behavior: SnackBarBehavior.floating,
       ),
     );
   }
 
-  // =====================================================
-  // BUILD PRINCIPAL
-  // =====================================================
-
   @override
   Widget build(BuildContext context) {
+    final c = CosColors.of(context);
     final visiveis = _dispositivosFiltrados;
 
     return Scaffold(
-      backgroundColor: _bg,
+      backgroundColor: c.bg,
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
@@ -494,70 +404,55 @@ class _DispositivoScreenState extends State<DispositivoScreen> {
                   title: 'Dispositivos',
                   subtitle:
                       '$_dispositivosOnline online · '
-                      '${_totalDispositivos - _dispositivosOnline} '
-                      'não conectados',
+                      '${_totalDispositivos - _dispositivosOnline} não conectados',
                   trailing: IconButton(
                     tooltip: 'Adicionar dispositivo',
                     onPressed: _cadastrando ? null : _adicionarDispositivo,
-                    icon: const Icon(Icons.add_rounded, color: _fg),
+                    icon: Icon(Icons.add_rounded, color: c.fg),
                   ),
                 ),
-
                 const SizedBox(height: 24),
-
-                _resumo(),
-
+                _resumo(c),
                 const SizedBox(height: 22),
-
-                _campoBusca(),
-
+                _campoBusca(c),
                 const SizedBox(height: 15),
-
-                _barraFiltros(),
-
+                _barraFiltros(c),
                 const SizedBox(height: 22),
-
                 Row(
                   children: [
-                    const Expanded(
+                    Expanded(
                       child: Text(
                         'Minha casa',
                         style: TextStyle(
-                          color: _fg,
+                          color: c.fg,
                           fontSize: 17,
                           fontWeight: FontWeight.w800,
                         ),
                       ),
                     ),
                     TextButton(
-                      onPressed: () {
-                        setState(() {
-                          _ordenarAZ = !_ordenarAZ;
-                        });
-                      },
+                      onPressed: () => setState(() => _ordenarAZ = !_ordenarAZ),
                       child: Text(
                         _ordenarAZ ? 'Ordenado A–Z' : 'Ordenar',
-                        style: const TextStyle(color: _mint),
+                        style: TextStyle(color: c.mint),
                       ),
                     ),
                   ],
                 ),
-
                 const SizedBox(height: 12),
-
                 if (_carregando)
-                  const Padding(
-                    padding: EdgeInsets.all(40),
+                  Padding(
+                    padding: const EdgeInsets.all(40),
                     child: Center(
-                      child: CircularProgressIndicator(color: _mint),
+                      child: CircularProgressIndicator(color: c.mint),
                     ),
                   )
                 else if (_erro != null)
-                  _estadoErro()
+                  _estadoErro(c)
                 else if (visiveis.isEmpty)
-                  _estadoVazio()
+                  _estadoVazio(c)
                 else
-                  ...visiveis.map(_cardDispositivo),
+                  ...visiveis.map((d) => _cardDispositivo(c, d)),
               ],
             ),
           ),
@@ -570,21 +465,17 @@ class _DispositivoScreenState extends State<DispositivoScreen> {
     );
   }
 
-  // =====================================================
-  // RESUMO
-  // =====================================================
-
-  Widget _resumo() {
+  Widget _resumo(CosColors c) {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: _panel,
+        color: c.panel,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: _border),
+        border: Border.all(color: c.border),
       ),
       child: Row(
         children: [
-          const Icon(Icons.devices_other_rounded, color: _mint, size: 32),
+          Icon(Icons.devices_other_rounded, color: c.mint, size: 32),
           const SizedBox(width: 16),
           Expanded(
             child: Column(
@@ -592,8 +483,8 @@ class _DispositivoScreenState extends State<DispositivoScreen> {
               children: [
                 Text(
                   '$_totalDispositivos dispositivos',
-                  style: const TextStyle(
-                    color: _fg,
+                  style: TextStyle(
+                    color: c.fg,
                     fontWeight: FontWeight.bold,
                     fontSize: 17,
                   ),
@@ -601,7 +492,7 @@ class _DispositivoScreenState extends State<DispositivoScreen> {
                 const SizedBox(height: 5),
                 Text(
                   '$_dispositivosLigados ligados',
-                  style: const TextStyle(color: _muted, fontSize: 12),
+                  style: TextStyle(color: c.muted, fontSize: 12),
                 ),
               ],
             ),
@@ -611,16 +502,10 @@ class _DispositivoScreenState extends State<DispositivoScreen> {
     );
   }
 
-  // =====================================================
-  // BUSCA
-  // =====================================================
-
-  Widget _campoBusca() {
+  Widget _campoBusca(CosColors c) {
     return TextField(
       controller: _buscaController,
-      onChanged: (valor) {
-        setState(() => _busca = valor);
-      },
+      onChanged: (valor) => setState(() => _busca = valor),
       decoration: InputDecoration(
         hintText: 'Buscar por nome ou ambiente',
         prefixIcon: const Icon(Icons.search_rounded),
@@ -634,44 +519,35 @@ class _DispositivoScreenState extends State<DispositivoScreen> {
               )
             : null,
         filled: true,
-        fillColor: _panel,
+        fillColor: c.panel,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: _border),
+          borderSide: BorderSide(color: c.border),
         ),
       ),
     );
   }
 
-  // =====================================================
-  // FILTROS
-  // =====================================================
-
-  Widget _barraFiltros() {
+  Widget _barraFiltros(CosColors c) {
     return SizedBox(
       height: 38,
       child: ListView(
         scrollDirection: Axis.horizontal,
         children: _filtros.map((filtro) {
           final selecionado = _filtro == filtro;
-
           return Padding(
             padding: const EdgeInsets.only(right: 8),
             child: ChoiceChip(
               label: Text(filtro),
               selected: selecionado,
-              selectedColor: _mint.withValues(alpha: 0.18),
-              backgroundColor: _panel2,
+              selectedColor: c.mint.withValues(alpha: 0.18),
+              backgroundColor: c.panel2,
               labelStyle: TextStyle(
-                color: selecionado ? _mint : _muted,
+                color: selecionado ? c.mint : c.muted,
                 fontSize: 11,
               ),
-              side: BorderSide(color: selecionado ? _mint : _border),
-              onSelected: (_) {
-                setState(() {
-                  _filtro = filtro;
-                });
-              },
+              side: BorderSide(color: selecionado ? c.mint : c.border),
+              onSelected: (_) => setState(() => _filtro = filtro),
             ),
           );
         }).toList(),
@@ -679,29 +555,25 @@ class _DispositivoScreenState extends State<DispositivoScreen> {
     );
   }
 
-  // =====================================================
-  // ESTADO VAZIO
-  // =====================================================
-
-  Widget _estadoVazio() {
+  Widget _estadoVazio(CosColors c) {
     return Container(
       padding: const EdgeInsets.all(28),
       decoration: BoxDecoration(
-        color: _panel,
+        color: c.panel,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: _border),
+        border: Border.all(color: c.border),
       ),
       child: Column(
         children: [
-          const Icon(Icons.devices_other_rounded, color: _mint, size: 52),
+          Icon(Icons.devices_other_rounded, color: c.mint, size: 52),
           const SizedBox(height: 16),
           Text(
             _dispositivos.isEmpty
                 ? 'Nenhum dispositivo cadastrado'
                 : 'Nenhum dispositivo encontrado',
             textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: _fg,
+            style: TextStyle(
+              color: c.fg,
               fontSize: 17,
               fontWeight: FontWeight.bold,
             ),
@@ -709,11 +581,10 @@ class _DispositivoScreenState extends State<DispositivoScreen> {
           const SizedBox(height: 10),
           Text(
             _dispositivos.isEmpty
-                ? 'Adicione seu primeiro dispositivo '
-                      'para começar a controlar sua casa.'
+                ? 'Adicione seu primeiro dispositivo para começar a controlar sua casa.'
                 : 'Tente alterar os filtros ou a busca.',
             textAlign: TextAlign.center,
-            style: const TextStyle(color: _muted),
+            style: TextStyle(color: c.muted),
           ),
           if (_dispositivos.isEmpty) ...[
             const SizedBox(height: 22),
@@ -722,8 +593,8 @@ class _DispositivoScreenState extends State<DispositivoScreen> {
               icon: const Icon(Icons.add),
               label: const Text('Adicionar dispositivo'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: _mint,
-                foregroundColor: _bg,
+                backgroundColor: c.mint,
+                foregroundColor: c.bg,
               ),
             ),
           ],
@@ -732,7 +603,7 @@ class _DispositivoScreenState extends State<DispositivoScreen> {
     );
   }
 
-  Widget _estadoErro() {
+  Widget _estadoErro(CosColors c) {
     return Padding(
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -742,7 +613,7 @@ class _DispositivoScreenState extends State<DispositivoScreen> {
           Text(
             'Erro ao carregar dispositivos:\n$_erro',
             textAlign: TextAlign.center,
-            style: const TextStyle(color: _fg),
+            style: TextStyle(color: c.fg),
           ),
           const SizedBox(height: 12),
           TextButton(
@@ -761,23 +632,18 @@ class _DispositivoScreenState extends State<DispositivoScreen> {
     );
   }
 
-  // =====================================================
-  // CARD DO DISPOSITIVO
-  // =====================================================
-
-  Widget _cardDispositivo(DispositivoIot dispositivo) {
+  Widget _cardDispositivo(CosColors c, DispositivoIot dispositivo) {
     final conectado = dispositivo.statusConexao == 'conectado';
-
     final ligado = dispositivo.ligado;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
-        color: _panel,
+        color: c.panel,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: ligado ? _mint.withValues(alpha: 0.4) : _border,
+          color: ligado ? c.mint.withValues(alpha: 0.4) : c.border,
         ),
       ),
       child: Row(
@@ -786,18 +652,16 @@ class _DispositivoScreenState extends State<DispositivoScreen> {
             width: 46,
             height: 46,
             decoration: BoxDecoration(
-              color: ligado ? _mint.withValues(alpha: 0.13) : _panel2,
+              color: ligado ? c.mint.withValues(alpha: 0.13) : c.panel2,
               borderRadius: BorderRadius.circular(13),
             ),
             child: Icon(
               _iconeDispositivo(dispositivo),
-              color: ligado ? _mint : _muted,
+              color: ligado ? c.mint : c.muted,
               size: 24,
             ),
           ),
-
           const SizedBox(width: 12),
-
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -806,8 +670,8 @@ class _DispositivoScreenState extends State<DispositivoScreen> {
                   dispositivo.nome,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: _fg,
+                  style: TextStyle(
+                    color: c.fg,
                     fontWeight: FontWeight.w700,
                     fontSize: 13,
                   ),
@@ -818,7 +682,7 @@ class _DispositivoScreenState extends State<DispositivoScreen> {
                   '${ligado ? 'Ligado' : 'Desligado'}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: _muted, fontSize: 11),
+                  style: TextStyle(color: c.muted, fontSize: 11),
                 ),
                 const SizedBox(height: 5),
                 Text(
@@ -828,33 +692,24 @@ class _DispositivoScreenState extends State<DispositivoScreen> {
                       ? 'Desconectado'
                       : 'Conexão desconhecida',
                   style: TextStyle(
-                    color: conectado ? _mint : _muted,
+                    color: conectado ? c.mint : c.muted,
                     fontSize: 10,
                   ),
                 ),
               ],
             ),
           ),
-
           Switch.adaptive(
             value: ligado,
-            onChanged: (valor) {
-              _alterarEstado(dispositivo, valor);
-            },
-            activeThumbColor: _mint,
+            onChanged: (valor) => _alterarEstado(dispositivo, valor),
+            activeThumbColor: c.mint,
           ),
-
           PopupMenuButton<String>(
             tooltip: 'Opções do dispositivo',
-            icon: const Icon(Icons.more_vert, color: _muted),
+            icon: Icon(Icons.more_vert, color: c.muted),
             onSelected: (opcao) {
-              if (opcao == 'editar') {
-                _editarDispositivo(dispositivo);
-              }
-
-              if (opcao == 'excluir') {
-                _excluirDispositivo(dispositivo);
-              }
+              if (opcao == 'editar') _editarDispositivo(dispositivo);
+              if (opcao == 'excluir') _excluirDispositivo(dispositivo);
             },
             itemBuilder: (context) => const [
               PopupMenuItem(value: 'editar', child: Text('Editar')),
@@ -866,10 +721,6 @@ class _DispositivoScreenState extends State<DispositivoScreen> {
     );
   }
 }
-
-// =====================================================
-// TELA DE CADASTRO DE DISPOSITIVOS
-// =====================================================
 
 class AdicionarDispositivoScreen extends StatefulWidget {
   final List<String> ambientes;
@@ -889,17 +740,10 @@ class AdicionarDispositivoScreen extends StatefulWidget {
 class _AdicionarDispositivoScreenState
     extends State<AdicionarDispositivoScreen> {
   final _formKey = GlobalKey<FormState>();
-
   final _nomeController = TextEditingController();
 
   String _tipo = 'Lâmpada';
   String _ambiente = 'Sem ambiente';
-
-  static const Color _bg = Color(0xFF080B0F);
-  static const Color _panel = Color(0xFF10151B);
-  static const Color _mint = Color(0xFF4FE0C0);
-  static const Color _fg = Color(0xFFF1F5F8);
-  static const Color _muted = Color(0xFF8A98A5);
 
   final List<String> _tipos = [
     'Lâmpada',
@@ -949,14 +793,15 @@ class _AdicionarDispositivoScreenState
 
   @override
   Widget build(BuildContext context) {
+    final c = CosColors.of(context);
     final ambientes = [...widget.ambientes, 'Sem ambiente'].toList();
 
     return Scaffold(
-      backgroundColor: _bg,
+      backgroundColor: c.bg,
       appBar: AppBar(
         title: const Text('Adicionar dispositivo'),
-        backgroundColor: _bg,
-        foregroundColor: _fg,
+        backgroundColor: c.bg,
+        foregroundColor: c.fg,
       ),
       body: Center(
         child: ConstrainedBox(
@@ -964,35 +809,28 @@ class _AdicionarDispositivoScreenState
           child: ListView(
             padding: const EdgeInsets.all(20),
             children: [
-              const Icon(Icons.devices_other_rounded, color: _mint, size: 64),
-
+              Icon(Icons.devices_other_rounded, color: c.mint, size: 64),
               const SizedBox(height: 15),
-
-              const Text(
+              Text(
                 'Novo dispositivo',
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  color: _fg,
+                  color: c.fg,
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
                 ),
               ),
-
               const SizedBox(height: 8),
-
-              const Text(
-                'Preencha as informações para cadastrar '
-                'um dispositivo na sua casa.',
+              Text(
+                'Preencha as informações para cadastrar um dispositivo na sua casa.',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: _muted),
+                style: TextStyle(color: c.muted),
               ),
-
               const SizedBox(height: 28),
-
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: _panel,
+                  color: c.panel,
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Form(
@@ -1001,7 +839,7 @@ class _AdicionarDispositivoScreenState
                     children: [
                       TextFormField(
                         controller: _nomeController,
-                        style: const TextStyle(color: _fg),
+                        style: TextStyle(color: c.fg),
                         decoration: const InputDecoration(
                           labelText: 'Nome do dispositivo',
                           hintText: 'Ex.: Luz da sala',
@@ -1009,33 +847,23 @@ class _AdicionarDispositivoScreenState
                         ),
                         validator: (valor) {
                           final nome = valor?.trim() ?? '';
-
-                          if (nome.isEmpty) {
-                            return 'Informe o nome.';
-                          }
-
+                          if (nome.isEmpty) return 'Informe o nome.';
                           if (nome.length > 80) {
                             return 'Máximo de 80 caracteres.';
                           }
-
                           final existe = widget.nomesExistentes.any(
                             (item) => item.toLowerCase() == nome.toLowerCase(),
                           );
-
                           if (existe) {
-                            return 'Já existe um dispositivo '
-                                'com esse nome.';
+                            return 'Já existe um dispositivo com esse nome.';
                           }
-
                           return null;
                         },
                       ),
-
                       const SizedBox(height: 18),
-
                       DropdownButtonFormField<String>(
                         initialValue: _tipo,
-                        dropdownColor: _panel,
+                        dropdownColor: c.panel,
                         decoration: const InputDecoration(
                           labelText: 'Tipo de dispositivo',
                         ),
@@ -1046,17 +874,13 @@ class _AdicionarDispositivoScreenState
                           );
                         }).toList(),
                         onChanged: (valor) {
-                          if (valor != null) {
-                            setState(() => _tipo = valor);
-                          }
+                          if (valor != null) setState(() => _tipo = valor);
                         },
                       ),
-
                       const SizedBox(height: 18),
-
                       DropdownButtonFormField<String>(
                         initialValue: _ambiente,
-                        dropdownColor: _panel,
+                        dropdownColor: c.panel,
                         decoration: const InputDecoration(
                           labelText: 'Ambiente',
                         ),
@@ -1067,14 +891,10 @@ class _AdicionarDispositivoScreenState
                           );
                         }).toList(),
                         onChanged: (valor) {
-                          if (valor != null) {
-                            setState(() => _ambiente = valor);
-                          }
+                          if (valor != null) setState(() => _ambiente = valor);
                         },
                       ),
-
                       const SizedBox(height: 28),
-
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton.icon(
@@ -1082,8 +902,8 @@ class _AdicionarDispositivoScreenState
                           icon: const Icon(Icons.add),
                           label: const Text('Cadastrar dispositivo'),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: _mint,
-                            foregroundColor: _bg,
+                            backgroundColor: c.mint,
+                            foregroundColor: c.bg,
                             padding: const EdgeInsets.all(16),
                           ),
                         ),
