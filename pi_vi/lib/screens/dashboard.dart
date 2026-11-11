@@ -3,13 +3,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'automacao.dart';
-import 'alertas.dart';
+import 'alerta.dart';
 import 'dispositivo.dart';
 import 'perfil.dart';
 import 'splash_screen.dart';
 
-import '../models/dispositivo_iot.dart';
 import '../models/alerta.dart';
+import '../models/dispositivo_iot.dart';
 import '../services/dispositivo_iot_service.dart';
 import '../services/firebase_service.dart';
 import '../widgets/cos_app_navigation.dart';

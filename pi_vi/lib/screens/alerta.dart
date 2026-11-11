@@ -48,7 +48,9 @@ class _AlertasScreenState extends State<AlertasScreen> {
   String _horario(Alerta alerta, DateTime agora) {
     final diferenca = agora.difference(alerta.criadoEm);
     if (!diferenca.isNegative && diferenca.inMinutes < 60) {
-      return diferenca.inMinutes < 1 ? 'Agora' : 'Há ${diferenca.inMinutes} min';
+      return diferenca.inMinutes < 1
+          ? 'Agora'
+          : 'Há ${diferenca.inMinutes} min';
     }
     return '${_grupo(alerta.criadoEm, agora)}, '
         '${_dois(alerta.criadoEm.hour)}:${_dois(alerta.criadoEm.minute)}';
@@ -103,7 +105,8 @@ class _AlertasScreenState extends State<AlertasScreen> {
   void _abrirAlerta(Alerta alerta) {
     widget.data.marcarLida(alerta);
     final (destino, acao) = switch (alerta.tipo) {
-      AlertaTipo.dispositivo || AlertaTipo.atualizacao => (1, 'Ver dispositivos'),
+      AlertaTipo.dispositivo ||
+      AlertaTipo.atualizacao => (1, 'Ver dispositivos'),
       AlertaTipo.energia || AlertaTipo.rotina => (2, 'Ver automações'),
       AlertaTipo.membro => (4, 'Ver perfil'),
     };
@@ -171,7 +174,9 @@ class _AlertasScreenState extends State<AlertasScreen> {
             );
             final grupos = <String, List<Alerta>>{};
             for (final alerta in visiveis) {
-              grupos.putIfAbsent(_grupo(alerta.criadoEm, agora), () => []).add(alerta);
+              grupos
+                  .putIfAbsent(_grupo(alerta.criadoEm, agora), () => [])
+                  .add(alerta);
             }
             final criticas = visiveis.where((a) => a.critico);
             final recomendada = criticas.isEmpty ? null : criticas.first;
@@ -194,7 +199,9 @@ class _AlertasScreenState extends State<AlertasScreen> {
                         style: IconButton.styleFrom(
                           backgroundColor: cosPanelElevated,
                           foregroundColor: cosForeground,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
                           minimumSize: const Size(48, 48),
                         ),
                         onPressed: _configuracoes,
@@ -206,8 +213,14 @@ class _AlertasScreenState extends State<AlertasScreen> {
                       spacing: 8,
                       runSpacing: 4,
                       children: [
-                        _filtroChip(_Filtro.todas, 'Todas · ${data.alertas.length}'),
-                        _filtroChip(_Filtro.criticas, 'Críticas · ${data.criticas}'),
+                        _filtroChip(
+                          _Filtro.todas,
+                          'Todas · ${data.alertas.length}',
+                        ),
+                        _filtroChip(
+                          _Filtro.criticas,
+                          'Críticas · ${data.criticas}',
+                        ),
                         _filtroChip(_Filtro.dispositivos, 'Dispositivos'),
                         _filtroChip(_Filtro.energia, 'Energia'),
                       ],
@@ -227,19 +240,33 @@ class _AlertasScreenState extends State<AlertasScreen> {
                             padding: const EdgeInsets.all(16),
                             child: Row(
                               children: [
-                                const Icon(Icons.gpp_maybe_outlined, color: _red),
+                                const Icon(
+                                  Icons.gpp_maybe_outlined,
+                                  color: _red,
+                                ),
                                 const SizedBox(width: 14),
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
-                                      const Text('Ação recomendada', style: _title),
+                                      const Text(
+                                        'Ação recomendada',
+                                        style: _title,
+                                      ),
                                       const SizedBox(height: 3),
-                                      Text(recomendada.descricao, style: _description),
+                                      Text(
+                                        recomendada.descricao,
+                                        style: _description,
+                                      ),
                                     ],
                                   ),
                                 ),
-                                const Icon(Icons.chevron_right_rounded, color: _red, size: 20),
+                                const Icon(
+                                  Icons.chevron_right_rounded,
+                                  color: _red,
+                                  size: 20,
+                                ),
                               ],
                             ),
                           ),
@@ -251,11 +278,18 @@ class _AlertasScreenState extends State<AlertasScreen> {
                         padding: EdgeInsets.symmetric(vertical: 60),
                         child: Column(
                           children: [
-                            Icon(Icons.notifications_none_rounded, color: cosMint, size: 40),
+                            Icon(
+                              Icons.notifications_none_rounded,
+                              color: cosMint,
+                              size: 40,
+                            ),
                             SizedBox(height: 14),
                             Text('Tudo em dia', style: _heading),
                             SizedBox(height: 8),
-                            Text('Nenhuma notificação neste filtro.', style: _description),
+                            Text(
+                              'Nenhuma notificação neste filtro.',
+                              style: _description,
+                            ),
                           ],
                         ),
                       ),
@@ -270,7 +304,9 @@ class _AlertasScreenState extends State<AlertasScreen> {
                             Text(grupo.key, style: _heading),
                             if (grupo.key == grupos.keys.first)
                               TextButton(
-                                onPressed: data.naoLidas == 0 ? null : data.marcarTodasLidas,
+                                onPressed: data.naoLidas == 0
+                                    ? null
+                                    : data.marcarTodasLidas,
                                 style: TextButton.styleFrom(
                                   foregroundColor: cosMint,
                                   disabledForegroundColor: cosMuted,
@@ -306,9 +342,13 @@ class _AlertasScreenState extends State<AlertasScreen> {
       selected: selecionado,
       showCheckmark: false,
       onSelected: (_) => setState(() => _filtro = filtro),
-      backgroundColor: critico ? _red.withValues(alpha: 0.18) : cosPanelElevated,
+      backgroundColor: critico
+          ? _red.withValues(alpha: 0.18)
+          : cosPanelElevated,
       selectedColor: cor.withValues(alpha: 0.2),
-      side: BorderSide(color: selecionado ? cor.withValues(alpha: 0.5) : Colors.transparent),
+      side: BorderSide(
+        color: selecionado ? cor.withValues(alpha: 0.5) : Colors.transparent,
+      ),
       shape: const StadiumBorder(),
       visualDensity: VisualDensity.compact,
       labelStyle: TextStyle(
@@ -348,7 +388,10 @@ class _AlertasScreenState extends State<AlertasScreen> {
                       const SizedBox(height: 6),
                       Text(alerta.descricao, style: _description),
                       const SizedBox(height: 6),
-                      Text(_horario(alerta, agora), style: const TextStyle(color: cosMuted, fontSize: 11)),
+                      Text(
+                        _horario(alerta, agora),
+                        style: const TextStyle(color: cosMuted, fontSize: 11),
+                      ),
                     ],
                   ),
                 ),
@@ -360,7 +403,10 @@ class _AlertasScreenState extends State<AlertasScreen> {
                       key: ValueKey('nao-lida-${alerta.id}'),
                       width: 8,
                       height: 8,
-                      decoration: const BoxDecoration(color: cosMint, shape: BoxShape.circle),
+                      decoration: const BoxDecoration(
+                        color: cosMint,
+                        shape: BoxShape.circle,
+                      ),
                     ),
                   ),
               ],
@@ -372,8 +418,16 @@ class _AlertasScreenState extends State<AlertasScreen> {
   }
 }
 
-const _heading = TextStyle(color: cosForeground, fontSize: 18, fontWeight: FontWeight.w700);
-const _title = TextStyle(color: cosForeground, fontSize: 14, fontWeight: FontWeight.w600);
+const _heading = TextStyle(
+  color: cosForeground,
+  fontSize: 18,
+  fontWeight: FontWeight.w700,
+);
+const _title = TextStyle(
+  color: cosForeground,
+  fontSize: 14,
+  fontWeight: FontWeight.w600,
+);
 const _description = TextStyle(color: cosMuted, fontSize: 12, height: 1.4);
 
 class _AlertaIcon extends StatelessWidget {
