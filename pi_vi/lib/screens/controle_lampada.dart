@@ -37,9 +37,25 @@ class _ControleLampadaScreenState extends State<ControleLampadaScreen> {
   final ServicoMqtt _mqtt = ServicoMqtt.instancia;
   StreamSubscription<String>? _assinatura;
 
-  /// Valor do slider enquanto o dedo está arrastando (null = usar o STATUS).
-  double? _brilhoArrastando;
-  double? _matizArrastando;
+  /// Envia no máximo um comando a cada 150 ms enquanto o dedo arrasta,
+  /// para a lâmpada acompanhar ao vivo sem inundar o broker.
+  static const Duration _intervaloEnvio = Duration(milliseconds: 150);
+
+  /// Quanto tempo esperamos a lâmpada confirmar antes de voltar a mostrar
+  /// o último STATUS recebido.
+  static const Duration _esperaConfirmacao = Duration(seconds: 2);
+
+  /// Valores "otimistas": o que o usuário pediu e a lâmpada ainda não
+  /// confirmou. Enquanto não são null, a tela mostra eles em vez do STATUS,
+  /// e o slider não "pula de volta" enquanto a confirmação viaja pela rede.
+  bool? _ligadoPedido;
+  double? _brilhoPedido;
+  Color? _corPedida;
+
+  bool _dedoNoBrilho = false;
+  bool _dedoNaCor = false;
+  DateTime _ultimoEnvio = DateTime.fromMillisecondsSinceEpoch(0);
+  Timer? _expiraPedidos;
 
   String get _id => widget.dispositivo.identificador;
 
@@ -49,19 +65,76 @@ class _ControleLampadaScreenState extends State<ControleLampadaScreen> {
     _mqtt.garantirConexao();
     _assinatura = _mqtt.mudancas
         .where((id) => id == _id)
-        .listen((_) => setState(() {}));
+        .listen((_) => _aoReceberEstado());
     _mqtt.status.addListener(_aoMudarStatus);
   }
 
   @override
   void dispose() {
     _assinatura?.cancel();
+    _expiraPedidos?.cancel();
     _mqtt.status.removeListener(_aoMudarStatus);
     super.dispose();
   }
 
   void _aoMudarStatus() {
     if (mounted) setState(() {});
+  }
+
+  /// Chegou um STATUS novo: descarta os pedidos que a lâmpada já confirmou.
+  void _aoReceberEstado() {
+    if (!mounted) return;
+    final estado = _mqtt.estadoDe(_id);
+    setState(() {
+      if (estado == null) return;
+      if (_ligadoPedido == estado.ligado) _ligadoPedido = null;
+      if (!_dedoNoBrilho && _brilhoPedido?.round() == estado.brilho) {
+        _brilhoPedido = null;
+      }
+      final cor = _corPedida;
+      if (!_dedoNaCor && cor != null && _mesmaCor(cor, estado.cor)) {
+        _corPedida = null;
+      }
+    });
+  }
+
+  static bool _mesmaCor(Color a, Color b) {
+    final ra = EstadoLampada.rgbDe(a);
+    final rb = EstadoLampada.rgbDe(b);
+    return ra[0] == rb[0] && ra[1] == rb[1] && ra[2] == rb[2];
+  }
+
+  /// Se a lâmpada não confirmar a tempo, volta a mostrar o STATUS real.
+  void _aguardarConfirmacao() {
+    _expiraPedidos?.cancel();
+    _expiraPedidos = Timer(_esperaConfirmacao, () {
+      if (!mounted) return;
+      setState(() {
+        _ligadoPedido = null;
+        if (!_dedoNoBrilho) _brilhoPedido = null;
+        if (!_dedoNaCor) _corPedida = null;
+      });
+    });
+  }
+
+  /// Envia durante o arraste, respeitando o intervalo mínimo.
+  void _enviarDuranteArraste({int? brilho, Color? cor}) {
+    final agora = DateTime.now();
+    if (agora.difference(_ultimoEnvio) < _intervaloEnvio) return;
+    _ultimoEnvio = agora;
+    _enviar(brilho: brilho, cor: cor);
+  }
+
+  void _pedirLigado(bool valor) {
+    setState(() => _ligadoPedido = valor);
+    _enviar(ligado: valor);
+    _aguardarConfirmacao();
+  }
+
+  void _pedirCor(Color valor) {
+    setState(() => _corPedida = valor);
+    _enviar(cor: valor);
+    _aguardarConfirmacao();
   }
 
   void _enviar({bool? ligado, int? brilho, Color? cor}) {
@@ -101,12 +174,12 @@ class _ControleLampadaScreenState extends State<ControleLampadaScreen> {
     final estado = _mqtt.estadoDe(_id);
     final online = _mqtt.conectado ? _mqtt.disponibilidadeDe(_id) : null;
     final podeControlar = _mqtt.conectado && online == true && estado != null;
-    final ligado = estado?.ligado ?? false;
-    final cor = estado?.cor ?? c.mint;
+    final ligado = _ligadoPedido ?? estado?.ligado ?? false;
+    final cor = _corPedida ?? estado?.cor ?? c.mint;
     final brilho =
-        _brilhoArrastando ??
+        _brilhoPedido ??
         (estado?.brilho ?? EstadoLampada.brilhoMaximo).toDouble();
-    final matiz = _matizArrastando ?? HSVColor.fromColor(cor).hue;
+    final matiz = HSVColor.fromColor(cor).hue;
 
     return Scaffold(
       backgroundColor: c.bg,
@@ -162,9 +235,7 @@ class _ControleLampadaScreenState extends State<ControleLampadaScreen> {
                       ),
                       value: ligado,
                       activeThumbColor: c.mint,
-                      onChanged: podeControlar
-                          ? (valor) => _enviar(ligado: valor)
-                          : null,
+                      onChanged: podeControlar ? _pedirLigado : null,
                     ),
                   ],
                 ),
@@ -186,14 +257,19 @@ class _ControleLampadaScreenState extends State<ControleLampadaScreen> {
                       divisions:
                           EstadoLampada.brilhoMaximo -
                           EstadoLampada.brilhoMinimo,
+                      onChangeStart: (_) => _dedoNoBrilho = true,
                       onChanged: podeControlar
-                          ? (v) => setState(() => _brilhoArrastando = v)
+                          ? (v) {
+                              setState(() => _brilhoPedido = v);
+                              _enviarDuranteArraste(brilho: v.round());
+                            }
                           : null,
-                      // Só envia ao soltar o dedo, para não inundar o broker.
+                      // Ao soltar, sempre envia o valor final.
                       onChangeEnd: podeControlar
                           ? (v) {
-                              setState(() => _brilhoArrastando = null);
+                              _dedoNoBrilho = false;
                               _enviar(brilho: v.round());
+                              _aguardarConfirmacao();
                             }
                           : null,
                     ),
@@ -216,9 +292,7 @@ class _ControleLampadaScreenState extends State<ControleLampadaScreen> {
                           _bolinhaCor(
                             c,
                             opcao,
-                            selecionada:
-                                EstadoLampada.rgbDe(opcao).toString() ==
-                                EstadoLampada.rgbDe(cor).toString(),
+                            selecionada: _mesmaCor(opcao, cor),
                             habilitada: podeControlar,
                           ),
                       ],
@@ -228,14 +302,24 @@ class _ControleLampadaScreenState extends State<ControleLampadaScreen> {
                       value: matiz,
                       max: 360,
                       activeColor: HSVColor.fromAHSV(1, matiz, 1, 1).toColor(),
+                      onChangeStart: (_) => _dedoNaCor = true,
                       onChanged: podeControlar
-                          ? (v) => setState(() => _matizArrastando = v)
+                          ? (v) {
+                              final novaCor = HSVColor.fromAHSV(
+                                1,
+                                v,
+                                1,
+                                1,
+                              ).toColor();
+                              setState(() => _corPedida = novaCor);
+                              _enviarDuranteArraste(cor: novaCor);
+                            }
                           : null,
                       onChangeEnd: podeControlar
                           ? (v) {
-                              setState(() => _matizArrastando = null);
-                              _enviar(
-                                cor: HSVColor.fromAHSV(1, v, 1, 1).toColor(),
+                              _dedoNaCor = false;
+                              _pedirCor(
+                                HSVColor.fromAHSV(1, v, 1, 1).toColor(),
                               );
                             }
                           : null,
@@ -270,7 +354,7 @@ class _ControleLampadaScreenState extends State<ControleLampadaScreen> {
   }) {
     return InkWell(
       customBorder: const CircleBorder(),
-      onTap: habilitada ? () => _enviar(cor: cor) : null,
+      onTap: habilitada ? () => _pedirCor(cor) : null,
       child: Container(
         width: 36,
         height: 36,
