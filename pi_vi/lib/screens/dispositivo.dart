@@ -278,11 +278,11 @@ class _DispositivoScreenState extends State<DispositivoScreen> {
     final tipoController = TextEditingController(text: dispositivo.tipo);
 
     String ambienteSelecionado = _ambiente(dispositivo);
-    final ambientes = [
+    final ambientes = {
       ...widget.ambientes,
       'Sem ambiente',
       ambienteSelecionado,
-    ].toList();
+    }.toList();
 
     final salvar = await showDialog<bool>(
       context: context,
@@ -835,7 +835,9 @@ class _AdicionarDispositivoScreenState
   @override
   Widget build(BuildContext context) {
     final c = CosColors.of(context);
-    final ambientes = [...widget.ambientes, 'Sem ambiente'].toList();
+    // Set ({...}) remove repetidos: a tela anterior já pode ter mandado
+    // 'Sem ambiente', e o Dropdown exige valores únicos.
+    final ambientes = {...widget.ambientes, 'Sem ambiente'}.toList();
 
     return Scaffold(
       backgroundColor: c.bg,
