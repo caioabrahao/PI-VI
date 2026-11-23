@@ -6,6 +6,7 @@ import '../models/dispositivo_iot.dart';
 import '../models/estado_lampada.dart';
 import '../services/servico_mqtt.dart';
 import '../theme.dart';
+import '../widgets/controles_luz.dart';
 
 /// Tela de controle de uma lâmpada SmartLight pelo MQTT.
 ///
@@ -23,17 +24,6 @@ class ControleLampadaScreen extends StatefulWidget {
 }
 
 class _ControleLampadaScreenState extends State<ControleLampadaScreen> {
-  static const List<Color> _coresRapidas = [
-    Color(0xFFFFFFFF),
-    Color(0xFFFFB74D),
-    Color(0xFFFF0000),
-    Color(0xFFFF00FF),
-    Color(0xFF0000FF),
-    Color(0xFF00FFFF),
-    Color(0xFF00FF00),
-    Color(0xFFFFFF00),
-  ];
-
   final ServicoMqtt _mqtt = ServicoMqtt.instancia;
   StreamSubscription<String>? _assinatura;
 
@@ -51,6 +41,11 @@ class _ControleLampadaScreenState extends State<ControleLampadaScreen> {
   bool? _ligadoPedido;
   double? _brilhoPedido;
   Color? _corPedida;
+
+  /// A lâmpada só entende RGB. A temperatura é só do app: guardamos a
+  /// última escolhida para o slider não pular, e enviamos o RGB do branco
+  /// equivalente (veja corDaTemperatura).
+  double _temperatura = 4000;
 
   bool _dedoNoBrilho = false;
   bool _dedoNaCor = false;
@@ -132,10 +127,45 @@ class _ControleLampadaScreenState extends State<ControleLampadaScreen> {
   }
 
   void _pedirCor(Color valor) {
+    _dedoNaCor = false;
     setState(() => _corPedida = valor);
     _enviar(cor: valor);
     _aguardarConfirmacao();
   }
+
+  /// Enquanto o dedo arrasta na roda de cores ou no slider de temperatura.
+  void _arrastarCor(Color valor) {
+    _dedoNaCor = true;
+    setState(() => _corPedida = valor);
+    _enviarDuranteArraste(cor: valor);
+  }
+
+  void _aplicarCena(CenaIluminacao cena) {
+    final brilho = _brilhoDaCena(cena);
+    setState(() {
+      _ligadoPedido = true;
+      _brilhoPedido = brilho.toDouble();
+      _corPedida = cena.cor;
+      _temperatura = cena.temperatura;
+    });
+    _enviar(ligado: true, brilho: brilho, cor: cena.cor);
+    _aguardarConfirmacao();
+  }
+
+  static int _brilhoDaCena(CenaIluminacao cena) => (cena.brilho * 100)
+      .round()
+      .clamp(EstadoLampada.brilhoMinimo, EstadoLampada.brilhoMaximo);
+
+  /// Brilho em % (10 a 100) <-> posição do slider (0 a 1).
+  static double _posicaoDoBrilho(double brilho) =>
+      (brilho - EstadoLampada.brilhoMinimo) /
+      (EstadoLampada.brilhoMaximo - EstadoLampada.brilhoMinimo);
+
+  static int _brilhoDaPosicao(double posicao) =>
+      (EstadoLampada.brilhoMinimo +
+              posicao *
+                  (EstadoLampada.brilhoMaximo - EstadoLampada.brilhoMinimo))
+          .round();
 
   void _enviar({bool? ligado, int? brilho, Color? cor}) {
     try {
@@ -179,7 +209,15 @@ class _ControleLampadaScreenState extends State<ControleLampadaScreen> {
     final brilho =
         _brilhoPedido ??
         (estado?.brilho ?? EstadoLampada.brilhoMaximo).toDouble();
-    final matiz = HSVColor.fromColor(cor).hue;
+
+    CenaIluminacao? cenaAtiva;
+    for (final cena in cenasIluminacao) {
+      if (ligado &&
+          _brilhoDaCena(cena) == brilho.round() &&
+          _mesmaCor(cena.cor, cor)) {
+        cenaAtiva = cena;
+      }
+    }
 
     return Scaffold(
       backgroundColor: c.bg,
@@ -190,141 +228,76 @@ class _ControleLampadaScreenState extends State<ControleLampadaScreen> {
       ),
       body: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 550),
+          constraints: const BoxConstraints(maxWidth: 600),
           child: ListView(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.fromLTRB(20, 14, 20, 28),
             children: [
-              _cartao(
-                c,
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.circle,
-                      size: 12,
-                      color: online == true ? c.mint : c.muted,
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        _textoConexao(online),
-                        style: TextStyle(color: c.fg),
-                      ),
-                    ),
-                    Text(_id, style: TextStyle(color: c.muted, fontSize: 11)),
-                  ],
-                ),
-              ),
+              _cartaoConexao(c, online),
               const SizedBox(height: 16),
-              _cartao(
-                c,
-                child: Column(
-                  children: [
-                    Icon(
-                      ligado ? Icons.lightbulb : Icons.lightbulb_outline,
-                      size: 96,
-                      color: ligado ? cor : c.muted,
-                    ),
-                    const SizedBox(height: 12),
-                    SwitchListTile.adaptive(
-                      title: Text(
-                        ligado ? 'Ligada' : 'Desligada',
-                        style: TextStyle(
-                          color: c.fg,
-                          fontWeight: FontWeight.bold,
+              // Sem conexão com a lâmpada, os controles ficam apagados.
+              IgnorePointer(
+                ignoring: !podeControlar,
+                child: AnimatedOpacity(
+                  duration: const Duration(milliseconds: 200),
+                  opacity: podeControlar ? 1 : 0.45,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _botaoLigar(c, ligado, cor),
+                      const SizedBox(height: 12),
+                      _painelSliders(c, brilho),
+                      const SizedBox(height: 13),
+                      _titulo(c, 'Cor'),
+                      const SizedBox(height: 10),
+                      Center(
+                        child: RodaDeCores(
+                          cor: cor,
+                          onChanged: _arrastarCor,
+                          onChangeEnd: _pedirCor,
                         ),
                       ),
-                      value: ligado,
-                      activeThumbColor: c.mint,
-                      onChanged: podeControlar ? _pedirLigado : null,
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-              _cartao(
-                c,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Brilho: ${brilho.round()}%',
-                      style: TextStyle(color: c.fg),
-                    ),
-                    Slider(
-                      value: brilho,
-                      min: EstadoLampada.brilhoMinimo.toDouble(),
-                      max: EstadoLampada.brilhoMaximo.toDouble(),
-                      divisions:
-                          EstadoLampada.brilhoMaximo -
-                          EstadoLampada.brilhoMinimo,
-                      onChangeStart: (_) => _dedoNoBrilho = true,
-                      onChanged: podeControlar
-                          ? (v) {
-                              setState(() => _brilhoPedido = v);
-                              _enviarDuranteArraste(brilho: v.round());
-                            }
-                          : null,
-                      // Ao soltar, sempre envia o valor final.
-                      onChangeEnd: podeControlar
-                          ? (v) {
-                              _dedoNoBrilho = false;
-                              _enviar(brilho: v.round());
-                              _aguardarConfirmacao();
-                            }
-                          : null,
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-              _cartao(
-                c,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Cor', style: TextStyle(color: c.fg)),
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 12,
-                      runSpacing: 12,
-                      children: [
-                        for (final opcao in _coresRapidas)
-                          _bolinhaCor(
-                            c,
-                            opcao,
-                            selecionada: _mesmaCor(opcao, cor),
-                            habilitada: podeControlar,
+                      const SizedBox(height: 14),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          for (final opcao in paletaCoresLuz)
+                            BolinhaCor(
+                              cor: opcao,
+                              selecionada: _mesmaCor(opcao, cor),
+                              onTap: () => _pedirCor(opcao),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      Row(
+                        children: [
+                          Expanded(child: _titulo(c, 'Cenas')),
+                          Text(
+                            cenaAtiva?.nome ?? 'Toque para aplicar',
+                            style: TextStyle(color: c.mint, fontSize: 10),
                           ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Slider(
-                      value: matiz,
-                      max: 360,
-                      activeColor: HSVColor.fromAHSV(1, matiz, 1, 1).toColor(),
-                      onChangeStart: (_) => _dedoNaCor = true,
-                      onChanged: podeControlar
-                          ? (v) {
-                              final novaCor = HSVColor.fromAHSV(
-                                1,
-                                v,
-                                1,
-                                1,
-                              ).toColor();
-                              setState(() => _corPedida = novaCor);
-                              _enviarDuranteArraste(cor: novaCor);
-                            }
-                          : null,
-                      onChangeEnd: podeControlar
-                          ? (v) {
-                              _dedoNaCor = false;
-                              _pedirCor(
-                                HSVColor.fromAHSV(1, v, 1, 1).toColor(),
-                              );
-                            }
-                          : null,
-                    ),
-                  ],
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        height: 78,
+                        child: ListView.separated(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: cenasIluminacao.length,
+                          separatorBuilder: (_, _) => const SizedBox(width: 8),
+                          itemBuilder: (context, index) {
+                            final cena = cenasIluminacao[index];
+                            return CartaoCena(
+                              c: c,
+                              cena: cena,
+                              selecionada: cenaAtiva == cena,
+                              onTap: () => _aplicarCena(cena),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -334,38 +307,158 @@ class _ControleLampadaScreenState extends State<ControleLampadaScreen> {
     );
   }
 
-  Widget _cartao(CosColors c, {required Widget child}) {
+  Widget _titulo(CosColors c, String texto) => Text(
+    texto,
+    style: TextStyle(color: c.fg, fontWeight: FontWeight.w800),
+  );
+
+  Widget _cartaoConexao(CosColors c, bool? online) {
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
       decoration: BoxDecoration(
         color: c.panel,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(15),
         border: Border.all(color: c.border),
       ),
-      child: child,
+      child: Row(
+        children: [
+          Icon(
+            Icons.circle,
+            size: 10,
+            color: online == true ? c.mint : c.muted,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              _textoConexao(online),
+              style: TextStyle(color: c.fg, fontSize: 12),
+            ),
+          ),
+          Text(_id, style: TextStyle(color: c.muted, fontSize: 10)),
+        ],
+      ),
     );
   }
 
-  Widget _bolinhaCor(
-    CosColors c,
-    Color cor, {
-    required bool selecionada,
-    required bool habilitada,
-  }) {
-    return InkWell(
-      customBorder: const CircleBorder(),
-      onTap: habilitada ? () => _pedirCor(cor) : null,
-      child: Container(
-        width: 36,
-        height: 36,
-        decoration: BoxDecoration(
-          color: cor,
-          shape: BoxShape.circle,
-          border: Border.all(
-            color: selecionada ? c.mint : c.border,
-            width: selecionada ? 3 : 1,
+  /// Botão redondo grande, igual ao da aba Automações. Brilha na cor da
+  /// lâmpada quando ela está ligada.
+  Widget _botaoLigar(CosColors c, bool ligado, Color cor) {
+    return Center(
+      child: Column(
+        children: [
+          GestureDetector(
+            onTap: () => _pedirLigado(!ligado),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 220),
+              width: 146,
+              height: 146,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: ligado ? cor.withValues(alpha: 0.08) : c.panel,
+                border: Border.all(
+                  color: ligado ? cor.withValues(alpha: 0.55) : c.border,
+                ),
+                boxShadow: ligado
+                    ? [
+                        BoxShadow(
+                          color: cor.withValues(alpha: 0.12),
+                          blurRadius: 28,
+                        ),
+                      ]
+                    : null,
+              ),
+              child: Center(
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 220),
+                  width: 90,
+                  height: 90,
+                  decoration: BoxDecoration(
+                    color: ligado ? cor : c.panelElevated,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.power_settings_new_rounded,
+                    color: ligado ? c.bg : c.muted,
+                    size: 38,
+                  ),
+                ),
+              ),
+            ),
           ),
-        ),
+          const SizedBox(height: 10),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                ligado ? 'Ligada' : 'Desligada',
+                style: TextStyle(
+                  color: c.fg,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Switch.adaptive(
+                value: ligado,
+                onChanged: _pedirLigado,
+                activeThumbColor: c.mint,
+                activeTrackColor: c.mint.withValues(alpha: 0.4),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _painelSliders(CosColors c, double brilho) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 10, 14, 11),
+      decoration: BoxDecoration(
+        color: c.panel,
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: c.border),
+      ),
+      child: Column(
+        children: [
+          LinhaSlider(
+            c: c,
+            titulo: 'Brilho',
+            textoValor: '${brilho.round()}%',
+            valor: _posicaoDoBrilho(brilho),
+            corAtiva: c.mint,
+            onChangeStart: (_) => _dedoNoBrilho = true,
+            onChanged: (v) {
+              final novo = _brilhoDaPosicao(v);
+              setState(() => _brilhoPedido = novo.toDouble());
+              _enviarDuranteArraste(brilho: novo);
+            },
+            // Ao soltar, sempre envia o valor final.
+            onChangeEnd: (v) {
+              _dedoNoBrilho = false;
+              _enviar(brilho: _brilhoDaPosicao(v));
+              _aguardarConfirmacao();
+            },
+          ),
+          const SizedBox(height: 7),
+          LinhaSlider(
+            c: c,
+            titulo: 'Temperatura',
+            textoValor:
+                '${_temperatura.round()} K · ${descreverTemperatura(_temperatura)}',
+            valor:
+                (_temperatura - temperaturaMinimaK) /
+                (temperaturaMaximaK - temperaturaMinimaK),
+            corAtiva: const Color(0xFFFFC45C),
+            onChanged: (v) {
+              _temperatura =
+                  temperaturaMinimaK +
+                  v * (temperaturaMaximaK - temperaturaMinimaK);
+              _arrastarCor(corDaTemperatura(_temperatura));
+            },
+            onChangeEnd: (_) => _pedirCor(corDaTemperatura(_temperatura)),
+          ),
+        ],
       ),
     );
   }
