@@ -257,8 +257,10 @@ class _ControleLampadaScreenState extends State<ControleLampadaScreen> {
                         ),
                       ),
                       const SizedBox(height: 14),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      // 11 cores não cabem numa linha no celular: o Wrap quebra a linha.
+                      Wrap(
+                        spacing: 10,
+                        runSpacing: 10,
                         children: [
                           for (final opcao in paletaCoresLuz)
                             BolinhaCor(

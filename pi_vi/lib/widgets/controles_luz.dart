@@ -9,6 +9,11 @@ import '../theme.dart';
 
 /// Cores rápidas mostradas como bolinhas.
 const paletaCoresLuz = [
+  // Cores puras: a lâmpada recebe exatamente 255 no canal.
+  Color(0xFFFFFFFF), // Branco
+  Color(0xFFFF0000), // Vermelho
+  Color(0xFF00FF00), // Verde
+  Color(0xFF0000FF), // Azul
   Color(0xFFFF5C5C),
   Color(0xFFFF984F),
   Color(0xFFFFD15C),
@@ -199,6 +204,9 @@ class BolinhaCor extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Num fundo claro a bolinha branca sumiria, e a borda branca de
+    // "selecionada" não aparece sobre ela. Cores claras ganham borda cinza.
+    final clara = cor.computeLuminance() > 0.8;
     return InkWell(
       customBorder: const CircleBorder(),
       onTap: onTap,
@@ -209,7 +217,12 @@ class BolinhaCor extends StatelessWidget {
           color: cor,
           shape: BoxShape.circle,
           border: selecionada
-              ? Border.all(color: Colors.white, width: 2)
+              ? Border.all(
+                  color: clara ? Colors.black54 : Colors.white,
+                  width: 2,
+                )
+              : clara
+              ? Border.all(color: Colors.black26)
               : null,
           boxShadow: selecionada
               ? [BoxShadow(color: cor.withValues(alpha: 0.4), blurRadius: 8)]
