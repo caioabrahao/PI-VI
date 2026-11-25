@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../models/dispositivo_iot.dart';
 import '../services/dispositivo_iot_service.dart';
 import '../theme.dart';
+import 'controle_lampada.dart';
 import '../widgets/cos_app_navigation.dart';
 
 class DispositivoListaItem {
@@ -15,8 +16,13 @@ class DispositivoListaItem {
   final bool ligado;
   final bool online;
 
+  /// ID real do hardware (ex.: `raphael-01`, `sl-a1b2c3d4e5f6`).
+  /// Vazio = o app gera um identificador local (`app-...`).
+  final String? identificador;
+
   const DispositivoListaItem({
     this.id,
+    this.identificador,
     required this.nome,
     required this.ambiente,
     required this.icone,
@@ -219,10 +225,7 @@ class _DispositivoScreenState extends State<DispositivoScreen> {
 
   Future<void> _alterarEstado(DispositivoIot dispositivo, bool ligado) async {
     try {
-      await DispositivoIotService.alterarEstado(
-        id: dispositivo.id,
-        ligado: ligado,
-      );
+      await DispositivoIotService.ligarOuDesligar(dispositivo, ligado);
     } catch (e) {
       _mensagem('Erro ao alterar dispositivo: $e');
     }
@@ -275,11 +278,11 @@ class _DispositivoScreenState extends State<DispositivoScreen> {
     final tipoController = TextEditingController(text: dispositivo.tipo);
 
     String ambienteSelecionado = _ambiente(dispositivo);
-    final ambientes = [
+    final ambientes = {
       ...widget.ambientes,
       'Sem ambiente',
       ambienteSelecionado,
-    ].toList();
+    }.toList();
 
     final salvar = await showDialog<bool>(
       context: context,
@@ -642,10 +645,31 @@ class _DispositivoScreenState extends State<DispositivoScreen> {
     );
   }
 
+  void _abrirControle(DispositivoIot dispositivo) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ControleLampadaScreen(dispositivo: dispositivo),
+      ),
+    );
+  }
+
   Widget _cardDispositivo(CosColors c, DispositivoIot dispositivo) {
     final conectado = dispositivo.statusConexao == 'conectado';
     final ligado = dispositivo.ligado;
 
+    return GestureDetector(
+      onTap: dispositivo.usaMqtt ? () => _abrirControle(dispositivo) : null,
+      child: _conteudoCard(c, dispositivo, conectado, ligado),
+    );
+  }
+
+  Widget _conteudoCard(
+    CosColors c,
+    DispositivoIot dispositivo,
+    bool conectado,
+    bool ligado,
+  ) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(15),
@@ -751,6 +775,7 @@ class _AdicionarDispositivoScreenState
     extends State<AdicionarDispositivoScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nomeController = TextEditingController();
+  final _identificadorController = TextEditingController();
 
   String _tipo = 'Lâmpada';
   String _ambiente = 'Sem ambiente';
@@ -767,6 +792,7 @@ class _AdicionarDispositivoScreenState
   @override
   void dispose() {
     _nomeController.dispose();
+    _identificadorController.dispose();
     super.dispose();
   }
 
@@ -790,7 +816,12 @@ class _AdicionarDispositivoScreenState
   void _salvar() {
     if (!_formKey.currentState!.validate()) return;
 
+    final identificador = _identificadorController.text.trim();
+
     final dispositivo = DispositivoListaItem(
+      identificador: _tipo == 'Lâmpada' && identificador.isNotEmpty
+          ? identificador
+          : null,
       nome: _nomeController.text.trim(),
       ambiente: _ambiente,
       icone: _icone,
@@ -804,7 +835,9 @@ class _AdicionarDispositivoScreenState
   @override
   Widget build(BuildContext context) {
     final c = CosColors.of(context);
-    final ambientes = [...widget.ambientes, 'Sem ambiente'].toList();
+    // Set ({...}) remove repetidos: a tela anterior já pode ter mandado
+    // 'Sem ambiente', e o Dropdown exige valores únicos.
+    final ambientes = {...widget.ambientes, 'Sem ambiente'}.toList();
 
     return Scaffold(
       backgroundColor: c.bg,
@@ -888,6 +921,34 @@ class _AdicionarDispositivoScreenState
                           if (valor != null) setState(() => _tipo = valor);
                         },
                       ),
+                      if (_tipo == 'Lâmpada') ...[
+                        const SizedBox(height: 18),
+                        TextFormField(
+                          controller: _identificadorController,
+                          style: TextStyle(color: c.fg),
+                          decoration: const InputDecoration(
+                            labelText: 'ID da SmartLight (opcional)',
+                            hintText: 'Ex.: raphael-01',
+                            helperText:
+                                'Preencha para controlar a lâmpada pelo MQTT.',
+                            prefixIcon: Icon(Icons.memory_rounded),
+                          ),
+                          validator: (valor) {
+                            final id = valor?.trim() ?? '';
+                            if (id.isEmpty) return null;
+                            if (id.length > 128) {
+                              return 'Máximo de 128 caracteres.';
+                            }
+                            if (!RegExp(r'^[a-zA-Z0-9_-]+$').hasMatch(id)) {
+                              return 'Use só letras, números, - e _.';
+                            }
+                            if (id.startsWith('app-')) {
+                              return 'O prefixo "app-" é reservado.';
+                            }
+                            return null;
+                          },
+                        ),
+                      ],
                       const SizedBox(height: 18),
                       DropdownButtonFormField<String>(
                         initialValue: _ambiente,

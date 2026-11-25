@@ -1,9 +1,9 @@
 import 'dart:async';
-import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
 import '../theme.dart';
+import '../widgets/controles_luz.dart';
 import '../widgets/cos_app_navigation.dart';
 
 enum AutomacaoDeviceType { lampada, tomada, hub }
@@ -221,54 +221,9 @@ class _AutomacaoScreenState extends State<AutomacaoScreen> {
     ),
   ];
 
-  static const _scenes = [
-    _LightingScene(
-      name: 'Leitura',
-      icon: Icons.menu_book_outlined,
-      color: Color(0xFFFFF1D2),
-      brightness: 0.95,
-      temperature: 5000,
-    ),
-    _LightingScene(
-      name: 'Relaxar',
-      icon: Icons.auto_awesome_outlined,
-      color: Color(0xFFFFB74D),
-      brightness: 0.55,
-      temperature: 2700,
-    ),
-    _LightingScene(
-      name: 'Cinema',
-      icon: Icons.movie_creation_outlined,
-      color: Color(0xFF9575CD),
-      brightness: 0.24,
-      temperature: 3000,
-    ),
-    _LightingScene(
-      name: 'Foco',
-      icon: Icons.center_focus_strong_outlined,
-      color: Color(0xFFEAF7FF),
-      brightness: 1,
-      temperature: 6000,
-    ),
-    _LightingScene(
-      name: 'Noturna',
-      icon: Icons.nightlight_outlined,
-      color: Color(0xFFFF7043),
-      brightness: 0.16,
-      temperature: 2200,
-    ),
-    _LightingScene(
-      name: 'Energizar',
-      icon: Icons.wb_sunny_outlined,
-      color: Color(0xFFFFD54F),
-      brightness: 0.88,
-      temperature: 4500,
-    ),
-  ];
-
   AutomacaoDeviceType _selected = AutomacaoDeviceType.lampada;
   String? _selectedDeviceId;
-  _LightingScene? _activeScene;
+  CenaIluminacao? _activeScene;
 
   List<AutomacaoDevice> get _categoryDevices =>
       widget.devices.where((device) => device.type == _selected).toList();
@@ -350,13 +305,13 @@ class _AutomacaoScreenState extends State<AutomacaoScreen> {
     widget.onPowerChanged(device.id, enabled);
   }
 
-  void _applyScene(_LightingScene scene) {
+  void _applyScene(CenaIluminacao scene) {
     final device = _selectedDevice;
     if (device == null) return;
     setState(() {
-      widget.data.setColor(device, scene.color);
-      widget.data.setBrightness(device, scene.brightness);
-      widget.data.setTemperature(device, scene.temperature);
+      widget.data.setColor(device, scene.cor);
+      widget.data.setBrightness(device, scene.brilho);
+      widget.data.setTemperature(device, scene.temperatura);
       _activeScene = scene;
       widget.data.setPower(device, true);
     });
@@ -368,8 +323,7 @@ class _AutomacaoScreenState extends State<AutomacaoScreen> {
     if (device == null) return;
     final selectedColor = await showDialog<Color>(
       context: context,
-      builder: (_) =>
-          _ColorPickerDialog(initialColor: widget.data.color(device)),
+      builder: (_) => DialogoRodaDeCores(corInicial: widget.data.color(device)),
     );
     if (selectedColor == null || !mounted) return;
     setState(() {
@@ -654,24 +608,24 @@ class _AutomacaoScreenState extends State<AutomacaoScreen> {
           ),
           child: Column(
             children: [
-              _SliderLine(
+              LinhaSlider(
                 c: c,
-                title: 'Brilho',
-                valueLabel: '${(brightness * 100).round()}%',
-                value: brightness,
-                activeColor: c.mint,
+                titulo: 'Brilho',
+                textoValor: '${(brightness * 100).round()}%',
+                valor: brightness,
+                corAtiva: c.mint,
                 onChanged: (value) => setState(() {
                   widget.data.setBrightness(device, value);
                   _activeScene = null;
                 }),
               ),
               const SizedBox(height: 7),
-              _SliderLine(
+              LinhaSlider(
                 c: c,
-                title: 'Temperatura',
-                valueLabel: '${temperature.round()} K · $temperatureLabel',
-                value: (temperature - 2200) / 4300,
-                activeColor: const Color(0xFFFFC45C),
+                titulo: 'Temperatura',
+                textoValor: '${temperature.round()} K · $temperatureLabel',
+                valor: (temperature - 2200) / 4300,
+                corAtiva: const Color(0xFFFFC45C),
                 onChanged: (value) => setState(() {
                   widget.data.setTemperature(device, 2200 + value * 4300);
                   _activeScene = null;
@@ -697,13 +651,15 @@ class _AutomacaoScreenState extends State<AutomacaoScreen> {
           ],
         ),
         const SizedBox(height: 2),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        // 11 cores não cabem numa linha no celular: o Wrap quebra a linha.
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
           children: [
-            for (final color in _palette)
-              _ColorDot(
-                color: color,
-                selected: widget.data.color(device) == color,
+            for (final color in paletaCoresLuz)
+              BolinhaCor(
+                cor: color,
+                selecionada: widget.data.color(device) == color,
                 onTap: () => setState(() {
                   widget.data.setColor(device, color);
                   _activeScene = null;
@@ -721,7 +677,7 @@ class _AutomacaoScreenState extends State<AutomacaoScreen> {
               ),
             ),
             Text(
-              _activeScene?.name ?? 'Toque para aplicar',
+              _activeScene?.nome ?? 'Toque para aplicar',
               style: TextStyle(color: c.mint, fontSize: 10),
             ),
           ],
@@ -731,14 +687,14 @@ class _AutomacaoScreenState extends State<AutomacaoScreen> {
           height: 78,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
-            itemCount: _scenes.length,
+            itemCount: cenasIluminacao.length,
             separatorBuilder: (_, _) => const SizedBox(width: 8),
             itemBuilder: (context, index) {
-              final scene = _scenes[index];
-              return _SceneCard(
+              final scene = cenasIluminacao[index];
+              return CartaoCena(
                 c: c,
-                scene: scene,
-                selected: _activeScene == scene,
+                cena: scene,
+                selecionada: _activeScene == scene,
                 onTap: () => _applyScene(scene),
               );
             },
@@ -1470,16 +1426,6 @@ class _AutomacaoScreenState extends State<AutomacaoScreen> {
   }
 }
 
-const _palette = [
-  Color(0xFFFF5C5C),
-  Color(0xFFFF984F),
-  Color(0xFFFFD15C),
-  Color(0xFF4FE0C0),
-  Color(0xFF7EC8FF), // Azul atualizado
-  Color(0xFF9C75FF),
-  Color(0xFFE66BEB),
-];
-
 class _HubSectionTitle extends StatelessWidget {
   final CosColors c;
   final String title;
@@ -1909,272 +1855,4 @@ class _DeviceSelectorCard extends StatelessWidget {
       ),
     );
   }
-}
-
-class _SliderLine extends StatelessWidget {
-  final CosColors c;
-  final String title;
-  final String valueLabel;
-  final double value;
-  final Color activeColor;
-  final ValueChanged<double> onChanged;
-
-  const _SliderLine({
-    required this.c,
-    required this.title,
-    required this.valueLabel,
-    required this.value,
-    required this.activeColor,
-    required this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                title,
-                style: TextStyle(
-                  color: c.fg,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-            Text(
-              valueLabel,
-              style: TextStyle(
-                color: activeColor,
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ],
-        ),
-        SliderTheme(
-          data: SliderTheme.of(context).copyWith(
-            trackHeight: 5,
-            activeTrackColor: activeColor,
-            inactiveTrackColor: c.panelElevated,
-            thumbColor: activeColor,
-            overlayShape: SliderComponentShape.noOverlay,
-          ),
-          child: Slider(value: value.clamp(0, 1), onChanged: onChanged),
-        ),
-      ],
-    );
-  }
-}
-
-class _ColorDot extends StatelessWidget {
-  final Color color;
-  final bool selected;
-  final VoidCallback onTap;
-
-  const _ColorDot({
-    required this.color,
-    required this.selected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      customBorder: const CircleBorder(),
-      onTap: onTap,
-      child: Container(
-        width: 27,
-        height: 27,
-        decoration: BoxDecoration(
-          color: color,
-          shape: BoxShape.circle,
-          border: selected ? Border.all(color: Colors.white, width: 2) : null,
-          boxShadow: selected
-              ? [BoxShadow(color: color.withValues(alpha: 0.4), blurRadius: 8)]
-              : null,
-        ),
-      ),
-    );
-  }
-}
-
-class _LightingScene {
-  final String name;
-  final IconData icon;
-  final Color color;
-  final double brightness;
-  final double temperature;
-
-  const _LightingScene({
-    required this.name,
-    required this.icon,
-    required this.color,
-    required this.brightness,
-    required this.temperature,
-  });
-}
-
-class _SceneCard extends StatelessWidget {
-  final CosColors c;
-  final _LightingScene scene;
-  final bool selected;
-  final VoidCallback onTap;
-
-  const _SceneCard({
-    required this.c,
-    required this.scene,
-    required this.selected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 90,
-      child: Material(
-        color: selected ? c.mint.withValues(alpha: 0.16) : c.panel,
-        borderRadius: BorderRadius.circular(13),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(13),
-          child: Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(13),
-              border: Border.all(color: selected ? c.mint : c.border),
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(scene.icon, color: selected ? c.mint : c.muted, size: 19),
-                const SizedBox(height: 5),
-                Text(scene.name, style: TextStyle(color: c.fg, fontSize: 9)),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ColorPickerDialog extends StatefulWidget {
-  final Color initialColor;
-
-  const _ColorPickerDialog({required this.initialColor});
-
-  @override
-  State<_ColorPickerDialog> createState() => _ColorPickerDialogState();
-}
-
-class _ColorPickerDialogState extends State<_ColorPickerDialog> {
-  late Color _selectedColor;
-
-  @override
-  void initState() {
-    super.initState();
-    _selectedColor = widget.initialColor;
-  }
-
-  void _updateColor(Offset position, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final offset = position - center;
-    final radius = math.min(size.width, size.height) / 2;
-    final distance = math.min(offset.distance / radius, 1.0);
-    final hue = (math.atan2(offset.dy, offset.dx) * 180 / math.pi + 360) % 360;
-    setState(() {
-      _selectedColor = HSVColor.fromAHSV(1, hue, distance, 1).toColor();
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final c = CosColors.of(context);
-    return AlertDialog(
-      backgroundColor: c.panel,
-      title: const Text('Personalizar cor'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          GestureDetector(
-            onPanDown: (details) =>
-                _updateColor(details.localPosition, const Size(220, 220)),
-            onPanUpdate: (details) =>
-                _updateColor(details.localPosition, const Size(220, 220)),
-            child: SizedBox(
-              width: 220,
-              height: 220,
-              child: CustomPaint(
-                key: const ValueKey('automation-color-wheel'),
-                painter: _ColorWheelPainter(),
-                child: Center(
-                  child: Container(
-                    width: 28,
-                    height: 28,
-                    decoration: BoxDecoration(
-                      color: _selectedColor,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 3),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            '#${_selectedColor.toARGB32().toRadixString(16).substring(2).toUpperCase()}',
-            style: TextStyle(color: c.muted, fontSize: 12),
-          ),
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancelar'),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.pop(context, _selectedColor),
-          child: const Text('Usar cor'),
-        ),
-      ],
-    );
-  }
-}
-
-class _ColorWheelPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final rect = Offset.zero & size;
-    final hueShader = const SweepGradient(
-      colors: [
-        Color(0xFFFF0000),
-        Color(0xFFFFFF00),
-        Color(0xFF00FF00),
-        Color(0xFF00FFFF),
-        Color(0xFF0000FF),
-        Color(0xFFFF00FF),
-        Color(0xFFFF0000),
-      ],
-    ).createShader(rect);
-    canvas.drawCircle(
-      rect.center,
-      math.min(size.width, size.height) / 2,
-      Paint()..shader = hueShader,
-    );
-    final saturationShader = const RadialGradient(
-      colors: [Colors.white, Color(0x00FFFFFF)],
-      stops: [0, 1],
-    ).createShader(rect);
-    canvas.drawCircle(
-      rect.center,
-      math.min(size.width, size.height) / 2,
-      Paint()..shader = saturationShader,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

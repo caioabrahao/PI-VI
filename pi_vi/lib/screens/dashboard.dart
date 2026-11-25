@@ -140,7 +140,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _adicionarDispositivo(DispositivoListaItem item) async {
-    final identificador = 'app-${DateTime.now().microsecondsSinceEpoch}';
+    final identificador =
+        item.identificador ??
+        '${DispositivoIot.prefixoIdentificadorLocal}'
+            '${DateTime.now().microsecondsSinceEpoch}';
     await DispositivoIotService.cadastrar(
       nome: item.nome,
       identificador: identificador,
@@ -151,10 +154,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Future<void> _alterarEstado(DispositivoIot dispositivo, bool ligado) async {
     try {
-      await DispositivoIotService.alterarEstado(
-        id: dispositivo.id,
-        ligado: ligado,
-      );
+      await DispositivoIotService.ligarOuDesligar(dispositivo, ligado);
     } catch (e) {
       _mostrarMensagem('Erro ao atualizar dispositivo: $e');
     }
@@ -359,39 +359,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Future<String?> _pedirNome({
     required String titulo,
     String inicial = '',
-  }) async {
-    final c = CosColors.of(context);
-    final controller = TextEditingController(text: inicial);
-
-    final resultado = await showDialog<String>(
+  }) {
+    return showDialog<String>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        backgroundColor: c.panel,
-        title: Text(titulo, style: TextStyle(color: c.fg)),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          maxLength: 80,
-          style: TextStyle(color: c.fg),
-          decoration: const InputDecoration(labelText: 'Nome'),
-          onSubmitted: (valor) => Navigator.pop(dialogContext, valor.trim()),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancelar'),
-          ),
-          ElevatedButton(
-            onPressed: () =>
-                Navigator.pop(dialogContext, controller.text.trim()),
-            child: const Text('Salvar'),
-          ),
-        ],
-      ),
+      builder: (_) => _DialogoNome(titulo: titulo, inicial: inicial),
     );
-
-    controller.dispose();
-    return resultado;
   }
 
   Future<bool> _confirmar({
@@ -1559,6 +1531,59 @@ class _AtalhoCard extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Diálogo que pede um nome. Ele é dono do próprio TextEditingController,
+/// então o controller só é descartado quando o diálogo sai da árvore
+/// (depois da animação de fechar), e não logo após o Navigator.pop.
+class _DialogoNome extends StatefulWidget {
+  const _DialogoNome({required this.titulo, this.inicial = ''});
+
+  final String titulo;
+  final String inicial;
+
+  @override
+  State<_DialogoNome> createState() => _DialogoNomeState();
+}
+
+class _DialogoNomeState extends State<_DialogoNome> {
+  late final TextEditingController _controller =
+      TextEditingController(text: widget.inicial);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _salvar() => Navigator.pop(context, _controller.text.trim());
+
+  @override
+  Widget build(BuildContext context) {
+    final c = CosColors.of(context);
+    return AlertDialog(
+      backgroundColor: c.panel,
+      title: Text(widget.titulo, style: TextStyle(color: c.fg)),
+      content: TextField(
+        controller: _controller,
+        autofocus: true,
+        maxLength: 80,
+        style: TextStyle(color: c.fg),
+        decoration: const InputDecoration(labelText: 'Nome'),
+        onSubmitted: (_) => _salvar(),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancelar'),
+        ),
+        ElevatedButton(
+          onPressed: _salvar,
+          child: const Text('Salvar'),
+        ),
+      ],
     );
   }
 }

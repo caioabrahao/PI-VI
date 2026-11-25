@@ -1,4 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Necessário no build de release para Firebase e MQTT. -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <application
         android:label="pi_vi"
         android:name="${applicationName}"

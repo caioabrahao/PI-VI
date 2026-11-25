@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+import 'servico_mqtt.dart';
+
 class FirebaseService {
   static final FirebaseAuth _auth = FirebaseAuth.instance;
   static final FirebaseFirestore _db = FirebaseFirestore.instance;
@@ -100,6 +102,7 @@ class FirebaseService {
 
   // Encerrar a sessão
   static Future<void> logout() async {
+    await ServicoMqtt.instancia.desconectar();
     await _auth.signOut();
   }
 
